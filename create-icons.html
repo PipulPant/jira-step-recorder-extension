@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Icon Generator</title>
+</head>
+<body>
+  <h2>Icon Generator for Chrome Extension</h2>
+  <p>This file helps you create the required icon files. You can:</p>
+  <ol>
+    <li>Use an online icon generator (e.g., <a href="https://www.favicon-generator.org/" target="_blank">favicon-generator.org</a>)</li>
+    <li>Create simple icons with text "JR" (Jira Recorder) in 16x16, 48x48, and 128x128 sizes</li>
+    <li>Use any icon creation tool to generate PNG files</li>
+  </ol>
+  <p><strong>Required files:</strong></p>
+  <ul>
+    <li>icon16.png (16x16 pixels)</li>
+    <li>icon48.png (48x48 pixels)</li>
+    <li>icon128.png (128x128 pixels)</li>
+  </ul>
+  <p><strong>Note:</strong> The extension will work without icons, but Chrome will show a default icon.</p>
+  
+  <canvas id="icon16" width="16" height="16"></canvas>
+  <canvas id="icon48" width="48" height="48"></canvas>
+  <canvas id="icon128" width="128" height="128"></canvas>
+  
+  <script>
+    function createIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+      
+      // Background
+      ctx.fillStyle = '#0052CC';
+      ctx.fillRect(0, 0, size, size);
+      
+      // Text
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${size * 0.6}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('JR', size / 2, size / 2);
+      
+      // Download
+      canvas.toBlob(function(blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `icon${size}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+    
+    // Create icons when page loads
+    window.onload = function() {
+      setTimeout(() => {
+        createIcon(document.getElementById('icon16'), 16);
+        setTimeout(() => {
+          createIcon(document.getElementById('icon48'), 48);
+          setTimeout(() => {
+            createIcon(document.getElementById('icon128'), 128);
+          }, 500);
+        }, 500);
+      }, 500);
+    };
+  </script>
+</body>
+</html>
+

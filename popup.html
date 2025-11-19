@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Jira Step Recorder</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container" style="position: relative;">
+    <div class="header">
+      <h1>🎯 Jira Step Recorder</h1>
+    </div>
+    
+    <div class="controls">
+      <button id="startBtn" class="btn btn-primary">Start Recording</button>
+      <button id="stopBtn" class="btn btn-danger" disabled>Stop Recording</button>
+      <button id="pauseBtn" class="btn btn-warning" disabled>Pause</button>
+      <button id="clearBtn" class="btn btn-secondary">Clear Steps</button>
+    </div>
+    
+    <div class="status" id="status">
+      <span id="statusText">Ready to record</span>
+      <div class="status-actions">
+        <span id="stepCount" class="step-count"></span>
+        <button id="copyStepsBtn" class="btn btn-small btn-primary" style="display: none;" title="Copy steps to clipboard">📋 Copy Steps</button>
+        <button id="settingsBtn" class="btn btn-small btn-icon" title="Settings">⚙️</button>
+      </div>
+    </div>
+    
+    <div class="steps-container">
+      <div class="steps-header">
+        <h2>Recorded Steps</h2>
+        <div class="steps-header-actions">
+          <button id="editModeBtn" class="btn btn-small" title="Toggle Edit Mode" disabled>✏️ Edit Mode</button>
+          <button id="undoBtn" class="btn btn-small btn-icon" title="Undo Last Step" disabled>↶</button>
+          <button id="saveBtn" class="btn btn-small" title="Save Recording" disabled>💾 Save</button>
+          <button id="exportBtn" class="btn btn-small">Export</button>
+        </div>
+      </div>
+      <div id="stepsList" class="steps-list">
+        <p class="empty-state">No steps recorded yet. Click "Start Recording" to begin.</p>
+      </div>
+    </div>
+    
+    <div class="saved-recordings-container">
+      <div class="saved-recordings-header">
+        <h2>Saved Recordings</h2>
+        <button id="refreshSavedBtn" class="btn btn-small btn-icon" title="Refresh">🔄</button>
+      </div>
+      <div id="savedRecordingsList" class="saved-recordings-list">
+        <p class="empty-state">No saved recordings. Save your recording to access it later.</p>
+      </div>
+    </div>
+    
+    <div id="exportModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Export Steps</h3>
+          <button class="close-btn" id="closeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="export-format-selector">
+            <label>Export Format:</label>
+            <select id="formatSelector">
+              <option value="jira">Jira</option>
+              <option value="markdown">Markdown</option>
+              <option value="html">HTML</option>
+              <option value="plaintext">Plain Text</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+          <textarea id="jiraOutput" readonly></textarea>
+          <div class="export-actions">
+            <button id="copyBtn" class="btn btn-primary">Copy to Clipboard</button>
+            <button id="downloadBtn" class="btn btn-secondary">Download File</button>
+            <button id="downloadScreenshotsBtn" class="btn btn-secondary" style="display: none;">📸 Download Screenshots</button>
+            <button id="openPreviewBtn" class="btn btn-secondary" style="display: none;">👁️ Open Preview</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="saveModal" class="modal">
+      <div class="modal-content modal-small">
+        <div class="modal-header">
+          <h3>Save Recording</h3>
+          <button class="close-btn" id="closeSaveModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="save-form">
+            <label>Recording Name:</label>
+            <input type="text" id="recordingNameInput" placeholder="Enter a name for this recording" maxlength="50">
+            <div class="save-actions">
+              <button id="confirmSaveBtn" class="btn btn-primary">Save</button>
+              <button id="cancelSaveBtn" class="btn btn-secondary">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="editModal" class="modal">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h3>Edit Steps Before Export</h3>
+          <button class="close-btn" id="closeEditModal">&times;</button>
+        </div>
+        <div class="modal-body edit-modal-body">
+          <div class="edit-steps-container">
+            <div class="edit-steps-list" id="editStepsList">
+              <!-- Steps will be populated here -->
+            </div>
+          </div>
+          <div class="edit-actions-bar">
+            <button id="addStepBtn" class="btn btn-small">+ Add Step</button>
+            <button id="reorderStepsBtn" class="btn btn-small">🔄 Reorder</button>
+            <div class="edit-actions-right">
+              <button id="cancelEditBtn" class="btn btn-secondary">Cancel</button>
+              <button id="saveEditsBtn" class="btn btn-primary">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Copy Steps Notification -->
+    <div id="copyNotification" class="copy-notification" style="display: none;">
+      <div class="copy-notification-overlay"></div>
+      <div class="copy-notification-content">
+        <div class="copy-notification-header">
+          <div class="copy-notification-icon">📋</div>
+          <div class="copy-notification-text">
+            <div class="copy-notification-title">Recording Stopped!</div>
+            <div class="copy-notification-message">Copy your steps or preview with images</div>
+          </div>
+          <button id="closeNotificationBtn" class="close-notification-btn">&times;</button>
+        </div>
+        <div class="copy-notification-actions" style="display: flex !important; visibility: visible !important;">
+          <button id="previewNotificationBtn" class="btn btn-secondary" style="display: inline-block !important; visibility: visible !important; opacity: 1 !important;">👁️ Preview Steps</button>
+          <button id="copyNotificationBtn" class="btn btn-primary" style="display: inline-block !important; visibility: visible !important; opacity: 1 !important;">Copy Steps</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+      <div class="modal-content modal-small">
+        <div class="modal-header">
+          <h3>Settings</h3>
+          <button class="close-btn" id="closeSettingsModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="settings-form">
+            <label>Notification Display Time (seconds):</label>
+            <input type="number" id="notificationTimeoutInput" min="5" max="120" value="20" style="width: 100%; padding: 6px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px;">
+            <div class="save-actions">
+              <button id="saveSettingsBtn" class="btn btn-primary">Save</button>
+              <button id="cancelSettingsBtn" class="btn btn-secondary">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
+
