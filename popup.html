@@ -6,52 +6,91 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Shared fixed-position tooltip for elements inside overflow-clipped containers -->
+  <div id="js-tooltip" style="
+    position: fixed;
+    background: #222;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 999999;
+    display: none;
+    line-height: 1.4;
+  "></div>
+  <!-- Screenshot hover preview tooltip -->
+  <div id="js-tooltip-img" style="position:fixed;z-index:999999;display:none;background:white;border:2px solid #0052CC;border-radius:6px;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,0.3);pointer-events:none;"><img id="js-tooltip-img-src" style="width:200px;height:auto;display:block;border-radius:3px;"></div>
   <div class="container" style="position: relative;">
     <div class="header">
-      <h1>🎯 Jira Step Recorder</h1>
+      <div class="header-brand">
+        <span class="header-icon"><svg width="22" height="22" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.3" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="8" cy="8" r="2.6" fill="#fff"/></svg></span>
+        <div>
+          <h1>Jira Step Recorder</h1>
+          <span class="header-subtitle" id="headerSubtitle">Ready to capture your workflow</span>
+        </div>
+      </div>
     </div>
-    
+
+    <div class="sections-wrapper">
+
     <div class="controls">
-      <button id="startBtn" class="btn btn-primary">Start Recording</button>
-      <button id="stopBtn" class="btn btn-danger" disabled>Stop Recording</button>
+      <button id="startBtn" class="btn btn-primary">Start</button>
+      <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
       <button id="pauseBtn" class="btn btn-warning" disabled>Pause</button>
-      <button id="clearBtn" class="btn btn-secondary">Clear Steps</button>
+      <button id="clearBtn" class="btn btn-secondary">Clear</button>
+      <button id="videoBtn" class="btn btn-video" data-tooltip="Record Video"></button>
     </div>
-    
+
     <div class="status" id="status">
       <span id="statusText">Ready to record</span>
       <div class="status-actions">
         <span id="stepCount" class="step-count"></span>
-        <button id="copyStepsBtn" class="btn btn-small btn-primary" style="display: none;" title="Copy steps to clipboard">📋 Copy Steps</button>
-        <button id="settingsBtn" class="btn btn-small btn-icon" title="Settings">⚙️</button>
+        <button id="settingsBtn" class="btn btn-small btn-icon" data-tooltip="Settings"></button>
       </div>
     </div>
-    
+
     <div class="steps-container">
       <div class="steps-header">
         <h2>Recorded Steps</h2>
         <div class="steps-header-actions">
-          <button id="editModeBtn" class="btn btn-small" title="Toggle Edit Mode" disabled>✏️ Edit Mode</button>
-          <button id="undoBtn" class="btn btn-small btn-icon" title="Undo Last Step" disabled>↶</button>
-          <button id="saveBtn" class="btn btn-small" title="Save Recording" disabled>💾 Save</button>
-          <button id="exportBtn" class="btn btn-small">Export</button>
+          <button id="editModeBtn" class="btn btn-icon-only" data-tooltip="Edit Mode" disabled></button>
+          <button id="undoBtn" class="btn btn-icon-only" data-tooltip="Undo Step" disabled></button>
+          <button id="deleteAllBtn" class="btn btn-icon-only btn-danger-outline" data-tooltip="Delete All" disabled></button>
+          <button id="saveBtn" class="btn btn-icon-only" data-tooltip="Save Recording" disabled></button>
         </div>
       </div>
       <div id="stepsList" class="steps-list">
         <p class="empty-state">No steps recorded yet. Click "Start Recording" to begin.</p>
       </div>
+      <div id="jiraGuidePanel" style="display:none;"></div>
+      <div class="steps-footer" id="stepsFooter" style="display:none;">
+        <button id="copyStepsFooterBtn" class="btn btn-secondary steps-footer-btn" data-tooltip="Copy with screenshots">Copy</button>
+        <button id="downloadReportBtn" class="btn btn-secondary steps-footer-btn" data-tooltip="Download .html file">Report</button>
+        <button id="exportBtn" class="btn btn-primary steps-footer-btn" data-tooltip="Export as Jira / Markdown / JSON">Export</button>
+      </div>
     </div>
-    
+
     <div class="saved-recordings-container">
       <div class="saved-recordings-header">
         <h2>Saved Recordings</h2>
-        <button id="refreshSavedBtn" class="btn btn-small btn-icon" title="Refresh">🔄</button>
+        <button id="refreshSavedBtn" class="btn btn-small btn-icon" data-tooltip="Refresh list"></button>
       </div>
+      <!-- Search row — shown when ≥2 recordings exist -->
+      <div class="saved-search-row" id="savedSearchRow" style="display:none; padding:6px 8px; border-bottom:1px solid #eee;">
+        <input type="text" id="savedSearchInput" placeholder="Search recordings..." style="width:100%; padding:5px 8px; border:1px solid #ddd; border-radius:4px; font-size:12px; outline:none; box-sizing:border-box;">
+      </div>
+      <!-- Tag filter row — shown when there are recordings with tags -->
+      <div id="savedTagFilterRow" style="display:none; padding:4px 8px 6px; border-bottom:1px solid #eee; flex-wrap:wrap; gap:4px;"></div>
       <div id="savedRecordingsList" class="saved-recordings-list">
         <p class="empty-state">No saved recordings. Save your recording to access it later.</p>
       </div>
     </div>
-    
+
+    </div><!-- end .sections-wrapper -->
+
     <div id="exportModal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
@@ -59,10 +98,14 @@
           <button class="close-btn" id="closeModal">&times;</button>
         </div>
         <div class="modal-body">
-          <div class="export-format-selector">
+          <div class="export-format-row">
+            <label>Document Title:</label>
+            <input type="text" id="reportTitleInput" placeholder="Execution Steps" maxlength="100">
+          </div>
+          <div class="export-format-row">
             <label>Export Format:</label>
             <select id="formatSelector">
-              <option value="jira">Jira</option>
+              <option value="jira">Jira Wiki Markup</option>
               <option value="markdown">Markdown</option>
               <option value="html">HTML</option>
               <option value="plaintext">Plain Text</option>
@@ -71,15 +114,17 @@
           </div>
           <textarea id="jiraOutput" readonly></textarea>
           <div class="export-actions">
-            <button id="copyBtn" class="btn btn-primary">Copy to Clipboard</button>
-            <button id="downloadBtn" class="btn btn-secondary">Download File</button>
-            <button id="downloadScreenshotsBtn" class="btn btn-secondary" style="display: none;">📸 Download Screenshots</button>
-            <button id="openPreviewBtn" class="btn btn-secondary" style="display: none;">👁️ Open Preview</button>
+            <button id="copyBtn" class="btn btn-primary export-btn-primary">Copy to Clipboard</button>
+            <div class="export-btn-secondary-row">
+              <button id="downloadBtn" class="btn btn-secondary">Download</button>
+              <button id="downloadScreenshotsBtn" class="btn btn-secondary" style="display:none;">Screenshots</button>
+              <button id="openPreviewBtn" class="btn btn-secondary" style="display:none;">Preview</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-    
+
     <div id="saveModal" class="modal">
       <div class="modal-content modal-small">
         <div class="modal-header">
@@ -88,17 +133,23 @@
         </div>
         <div class="modal-body">
           <div class="save-form">
-            <label>Recording Name:</label>
-            <input type="text" id="recordingNameInput" placeholder="Enter a name for this recording" maxlength="50">
+            <div class="form-group">
+              <label>Recording Name</label>
+              <input type="text" id="recordingNameInput" placeholder="e.g. Login flow bug" maxlength="50">
+            </div>
+            <div class="form-group">
+              <label>Tags <span style="font-weight:400;color:var(--text-m)">(optional, comma-separated)</span></label>
+              <input type="text" id="recordingTagsInput" placeholder="e.g. bug, login, regression">
+            </div>
             <div class="save-actions">
-              <button id="confirmSaveBtn" class="btn btn-primary">Save</button>
+              <button id="confirmSaveBtn" class="btn btn-primary">Save Recording</button>
               <button id="cancelSaveBtn" class="btn btn-secondary">Cancel</button>
             </div>
           </div>
         </div>
       </div>
     </div>
-    
+
     <div id="editModal" class="modal">
       <div class="modal-content modal-large">
         <div class="modal-header">
@@ -113,7 +164,7 @@
           </div>
           <div class="edit-actions-bar">
             <button id="addStepBtn" class="btn btn-small">+ Add Step</button>
-            <button id="reorderStepsBtn" class="btn btn-small">🔄 Reorder</button>
+            <button id="reorderStepsBtn" class="btn btn-small">Reorder</button>
             <div class="edit-actions-right">
               <button id="cancelEditBtn" class="btn btn-secondary">Cancel</button>
               <button id="saveEditsBtn" class="btn btn-primary">Save Changes</button>
@@ -122,13 +173,13 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Copy Steps Notification -->
     <div id="copyNotification" class="copy-notification" style="display: none;">
       <div class="copy-notification-overlay"></div>
       <div class="copy-notification-content">
         <div class="copy-notification-header">
-          <div class="copy-notification-icon">📋</div>
+          <div class="copy-notification-icon"></div>
           <div class="copy-notification-text">
             <div class="copy-notification-title">Recording Stopped!</div>
             <div class="copy-notification-message">Copy your steps or preview with images</div>
@@ -136,12 +187,12 @@
           <button id="closeNotificationBtn" class="close-notification-btn">&times;</button>
         </div>
         <div class="copy-notification-actions" style="display: flex !important; visibility: visible !important;">
-          <button id="previewNotificationBtn" class="btn btn-secondary" style="display: inline-block !important; visibility: visible !important; opacity: 1 !important;">👁️ Preview Steps</button>
+          <button id="previewNotificationBtn" class="btn btn-secondary" style="display: inline-block !important; visibility: visible !important; opacity: 1 !important;">Preview Steps</button>
           <button id="copyNotificationBtn" class="btn btn-primary" style="display: inline-block !important; visibility: visible !important; opacity: 1 !important;">Copy Steps</button>
         </div>
       </div>
     </div>
-    
+
     <!-- Settings Modal -->
     <div id="settingsModal" class="modal">
       <div class="modal-content modal-small">
@@ -151,10 +202,20 @@
         </div>
         <div class="modal-body">
           <div class="settings-form">
-            <label>Notification Display Time (seconds):</label>
-            <input type="number" id="notificationTimeoutInput" min="5" max="120" value="20" style="width: 100%; padding: 6px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px;">
+            <div class="form-group">
+              <label>Notification display time (seconds)</label>
+              <input type="number" id="notificationTimeoutInput" min="5" max="120" value="20">
+            </div>
+            <div class="settings-section">
+              <label>Ignore Patterns</label>
+              <p>Steps matching these patterns will not be recorded (one per line). Matches against URL or element description.</p>
+              <textarea id="ignorePatternsInput" rows="4" style="font-family:monospace; font-size:11px; resize:vertical;" placeholder="analytics.google.com&#10;cookie-banner&#10;#drift-widget"></textarea>
+            </div>
+            <div class="settings-shortcuts">
+              <kbd>Alt+Shift+S</kbd> Start / Stop &nbsp;•&nbsp; <kbd>Alt+Shift+P</kbd> Pause / Resume
+            </div>
             <div class="save-actions">
-              <button id="saveSettingsBtn" class="btn btn-primary">Save</button>
+              <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
               <button id="cancelSettingsBtn" class="btn btn-secondary">Cancel</button>
             </div>
           </div>
@@ -162,8 +223,7 @@
       </div>
     </div>
   </div>
-  
+
   <script src="popup.js"></script>
 </body>
 </html>
-

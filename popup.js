@@ -1,8 +1,44 @@
 // Popup script
+
+// ── Shared icon set (inline SVG, currentColor — no external icon font/library) ──
+const ICONS = {
+  play: '<svg class="icon" viewBox="0 0 16 16"><polygon points="5,3.3 13,8 5,12.7" fill="currentColor"/></svg>',
+  stop: '<svg class="icon" viewBox="0 0 16 16"><rect x="4.3" y="4.3" width="7.4" height="7.4" rx="1" fill="currentColor"/></svg>',
+  pause: '<svg class="icon" viewBox="0 0 16 16"><rect x="4" y="3.3" width="2.8" height="9.4" rx="0.6" fill="currentColor"/><rect x="9.2" y="3.3" width="2.8" height="9.4" rx="0.6" fill="currentColor"/></svg>',
+  trash: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2.3 4.5h11.4M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4.6 4.5l.6 8.3a1 1 0 0 0 1 .9h3.6a1 1 0 0 0 1-.9l.6-8.3"/></svg>',
+  video: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4.7" width="7.8" height="6.6" rx="1.2"/><path d="M10.4 6.7L14 4.9v6.2l-3.6-1.8z" fill="currentColor" stroke="none"/></svg>',
+  dot: '<svg class="icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.5" fill="currentColor"/></svg>',
+  gear: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="3" y1="5" x2="13" y2="5"/><circle cx="6.3" cy="5" r="1.3" fill="currentColor" stroke="none"/><line x1="3" y1="8" x2="13" y2="8"/><circle cx="9.7" cy="8" r="1.3" fill="currentColor" stroke="none"/><line x1="3" y1="11" x2="13" y2="11"/><circle cx="7" cy="11" r="1.3" fill="currentColor" stroke="none"/></svg>',
+  pencil: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><path d="M2.5 13.5l.6-3L10.5 3l3 3-7.4 7.5z"/><path d="M9 4.5l3 3"/></svg>',
+  check: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8.5 6.5,12 13,4.5"/></svg>',
+  undo: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.3C6 3.3 3.3 5.4 3.3 8s2.7 4.7 5.7 3.7"/><polyline points="6.8,2.8 9,4.3 7.3,6.4"/></svg>',
+  save: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M3 3h7.3L13 5.7V13H3z"/><rect x="5.3" y="3" width="4" height="3"/><rect x="5" y="9" width="6" height="4" fill="currentColor" stroke="none"/></svg>',
+  clipboard: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="3.5" y="4" width="9" height="10" rx="1"/><rect x="5.3" y="2.3" width="5.4" height="2.6" rx="0.7"/></svg>',
+  download: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.3v7.4M5.2 7l2.8 2.8L10.8 7"/><path d="M3 12.7h10"/></svg>',
+  upload: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9.7V2.3M5.2 5l2.8-2.8L10.8 5"/><path d="M3 12.7h10"/></svg>',
+  refresh: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5A5.5 5.5 0 0 0 3.4 6.3"/><polyline points="3,3 3.4,6.3 6.6,5.6"/><path d="M3 11A5.5 5.5 0 0 0 12.6 9.7"/><polyline points="13,13 12.6,9.7 9.4,10.4"/></svg>',
+  eye: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1.3 8S4 3.7 8 3.7 14.7 8 14.7 8 12 12.3 8 12.3 1.3 8 1.3 8z"/><circle cx="8" cy="8" r="2" fill="currentColor" stroke="none"/></svg>',
+  folder: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M2 4.5h4.2l1.1 1.4H14v6.6H2z"/></svg>',
+  camera: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"><rect x="2" y="5" width="12" height="8" rx="1.3"/><path d="M5.5 5l.9-1.4h3.2L10.5 5"/><circle cx="8" cy="9" r="2.1"/></svg>',
+  note: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"><rect x="3" y="2.3" width="10" height="11.4" rx="1"/><line x1="5.3" y1="6" x2="10.7" y2="6"/><line x1="5.3" y1="9" x2="10.7" y2="9"/></svg>',
+  grip: '<svg class="icon" viewBox="0 0 16 16"><circle cx="5.3" cy="4" r="1.1" fill="currentColor"/><circle cx="10.7" cy="4" r="1.1" fill="currentColor"/><circle cx="5.3" cy="8" r="1.1" fill="currentColor"/><circle cx="10.7" cy="8" r="1.1" fill="currentColor"/><circle cx="5.3" cy="12" r="1.1" fill="currentColor"/><circle cx="10.7" cy="12" r="1.1" fill="currentColor"/></svg>'
+};
+
 let steps = [];
 let isRecording = false;
 let isPaused = false;
 let editingStepIndex = null;
+let editingNoteIndex = null;
+
+// ── Environment info ───────────────────────────────────────────────
+function getEnvironmentInfo() {
+  return {
+    browser: navigator.userAgent.match(/Chrome\/[\d.]+/)?.[0] || 'Chrome',
+    os: navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform) || 'Unknown OS',
+    viewport: `${window.screen.width}×${window.screen.height}`,
+    timestamp: new Date().toLocaleString()
+  };
+}
 
 // DOM elements
 const container = document.querySelector('.container');
@@ -19,7 +55,8 @@ const undoBtn = document.getElementById('undoBtn');
 const exportBtn = document.getElementById('exportBtn');
 const statusText = document.getElementById('statusText');
 const stepCount = document.getElementById('stepCount');
-const copyStepsBtn = document.getElementById('copyStepsBtn');
+const copyStepsBtn = document.getElementById('copyStepsFooterBtn');
+const stepsFooter = document.getElementById('stepsFooter');
 const copyNotification = document.getElementById('copyNotification');
 const copyNotificationBtn = document.getElementById('copyNotificationBtn');
 const previewNotificationBtn = document.getElementById('previewNotificationBtn');
@@ -38,6 +75,7 @@ const downloadBtn = document.getElementById('downloadBtn');
 const downloadScreenshotsBtn = document.getElementById('downloadScreenshotsBtn');
 const closeModal = document.getElementById('closeModal');
 const formatSelector = document.getElementById('formatSelector');
+const reportTitleInput = document.getElementById('reportTitleInput');
 const saveBtn = document.getElementById('saveBtn');
 const saveModal = document.getElementById('saveModal');
 const closeSaveModal = document.getElementById('closeSaveModal');
@@ -46,7 +84,10 @@ const cancelSaveBtn = document.getElementById('cancelSaveBtn');
 const recordingNameInput = document.getElementById('recordingNameInput');
 const savedRecordingsList = document.getElementById('savedRecordingsList');
 const refreshSavedBtn = document.getElementById('refreshSavedBtn');
+const deleteAllBtn = document.getElementById('deleteAllBtn');
 const editModeBtn = document.getElementById('editModeBtn');
+const videoBtn = document.getElementById('videoBtn');
+const downloadReportBtn = document.getElementById('downloadReportBtn');
 const editModal = document.getElementById('editModal');
 const closeEditModal = document.getElementById('closeEditModal');
 const editStepsList = document.getElementById('editStepsList');
@@ -56,6 +97,84 @@ const cancelEditBtn = document.getElementById('cancelEditBtn');
 const saveEditsBtn = document.getElementById('saveEditsBtn');
 let isEditMode = false;
 let isReordering = false;
+
+// ── Populate static icon buttons (toggled-state buttons set their own icon elsewhere) ──
+startBtn.innerHTML = ICONS.play + ' Start';
+stopBtn.innerHTML = ICONS.stop + ' Stop';
+clearBtn.innerHTML = ICONS.trash + ' Clear';
+videoBtn.innerHTML = ICONS.video;
+settingsBtn.innerHTML = ICONS.gear;
+editModeBtn.innerHTML = ICONS.pencil;
+undoBtn.innerHTML = ICONS.undo;
+deleteAllBtn.innerHTML = ICONS.trash;
+saveBtn.innerHTML = ICONS.save;
+copyStepsBtn.innerHTML = ICONS.clipboard + ' Copy';
+downloadReportBtn.innerHTML = ICONS.download + ' Report';
+exportBtn.innerHTML = ICONS.upload + ' Export';
+refreshSavedBtn.innerHTML = ICONS.refresh;
+copyBtn.innerHTML = ICONS.clipboard + ' Copy to Clipboard';
+downloadBtn.innerHTML = ICONS.download + ' Download';
+if (downloadScreenshotsBtn) downloadScreenshotsBtn.innerHTML = ICONS.camera + ' Screenshots';
+if (openPreviewBtn) openPreviewBtn.innerHTML = ICONS.eye + ' Preview';
+reorderStepsBtn.innerHTML = ICONS.refresh + ' Reorder';
+if (previewNotificationBtn) previewNotificationBtn.innerHTML = ICONS.eye + ' Preview Steps';
+const copyNotificationIconEl = document.querySelector('.copy-notification-icon');
+if (copyNotificationIconEl) copyNotificationIconEl.innerHTML = ICONS.clipboard.replace('class="icon"', 'class="icon icon-lg"');
+
+// Video recording state
+let videoRecordingEnabled = false;
+let mediaRecorder = null;
+let videoChunks = [];
+let videoStream = null;
+
+// ── Video recording helpers ──────────────────────────────────────
+function stopVideoRecording(autoSave) {
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+    // Clean up stream if any
+    if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+    return;
+  }
+  mediaRecorder.onstop = () => {
+    if (videoChunks.length > 0) {
+      const blob = new Blob(videoChunks, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `screen-recording-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+    videoChunks = [];
+    if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+    mediaRecorder = null;
+    if (videoBtn) {
+      videoBtn.innerHTML = ICONS.video;
+      videoBtn.classList.remove('btn-video-active');
+    }
+  };
+  try { mediaRecorder.stop(); } catch (_) {}
+}
+
+// Video toggle button
+if (videoBtn) {
+  videoBtn.addEventListener('click', () => {
+    if (isRecording) {
+      // If recording is active, stop/download video immediately
+      stopVideoRecording(true);
+      videoRecordingEnabled = false;
+      videoBtn.classList.remove('btn-video-active');
+      videoBtn.innerHTML = ICONS.video;
+      return;
+    }
+    videoRecordingEnabled = !videoRecordingEnabled;
+    videoBtn.classList.toggle('btn-video-active', videoRecordingEnabled);
+    videoBtn.title = videoRecordingEnabled
+      ? 'Video ON — will capture screen when you click ▶ Start (click to disable)'
+      : 'Enable screen video recording alongside step capture';
+  });
+}
 
 // Initialize
 chrome.runtime.sendMessage({ action: 'getSteps' }, (response) => {
@@ -86,42 +205,137 @@ function loadSavedRecordings() {
 }
 
 // Display saved recordings
+let activeTagFilter = null; // module-level for tag filter state
+
 function displaySavedRecordings(recordings) {
+  const savedSearchRow = document.getElementById('savedSearchRow');
+  const savedTagFilterRow = document.getElementById('savedTagFilterRow');
+
   if (!recordings || recordings.length === 0) {
     savedRecordingsList.innerHTML = '<p class="empty-state">No saved recordings. Save your recording to access it later.</p>';
+    if (savedSearchRow) savedSearchRow.style.display = 'none';
+    if (savedTagFilterRow) savedTagFilterRow.style.display = 'none';
     return;
   }
-  
+
   // Sort by date (newest first)
   recordings.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
-  
-  savedRecordingsList.innerHTML = recordings.map((recording, index) => {
+
+  // Show/hide search row based on recordings count
+  if (savedSearchRow) {
+    savedSearchRow.style.display = recordings.length >= 2 ? 'block' : 'none';
+  }
+
+  // Collect all tags across recordings
+  const allTags = [];
+  recordings.forEach(r => { if (r.tags && r.tags.length) r.tags.forEach(t => { if (!allTags.includes(t)) allTags.push(t); }); });
+
+  // Build tag filter row
+  if (savedTagFilterRow) {
+    if (allTags.length > 0) {
+      savedTagFilterRow.style.display = 'flex';
+      savedTagFilterRow.innerHTML = '<span style="font-size:10px;color:#666;margin-right:4px;line-height:24px;">Filter:</span>' +
+        allTags.map(tag => `<button class="tag-filter-btn tag-pill" data-tag="${escapeHtml(tag)}" style="cursor:pointer;border:1px solid #0052CC;">${escapeHtml(tag)}</button>`).join('');
+      savedTagFilterRow.querySelectorAll('.tag-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tag = btn.dataset.tag;
+          activeTagFilter = activeTagFilter === tag ? null : tag;
+          applyRecordingFilters();
+          savedTagFilterRow.querySelectorAll('.tag-filter-btn').forEach(b => {
+            b.style.background = b.dataset.tag === activeTagFilter ? '#0052CC' : '#DEEBFF';
+            b.style.color = b.dataset.tag === activeTagFilter ? 'white' : '#0747A6';
+          });
+        });
+      });
+    } else {
+      savedTagFilterRow.style.display = 'none';
+    }
+  }
+
+  savedRecordingsList.innerHTML = recordings.map((recording) => {
     const date = new Date(recording.savedAt);
-    const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const hasScreenshots = recording.steps.some(s => s.screenshot);
+    const tags = recording.tags || [];
+    const tagHtml = tags.length ? `<div style="margin-top:4px;">${tags.map(t => `<span class="tag-pill">${escapeHtml(t)}</span>`).join('')}</div>` : '';
     return `
-      <div class="saved-recording-item">
+      <div class="saved-recording-item" data-recording-id="${recording.id}" data-recording-name="${escapeHtml(recording.name)}" data-recording-tags="${escapeHtml((tags).join(','))}">
         <div class="saved-recording-info">
           <div class="saved-recording-name">${escapeHtml(recording.name)}</div>
           <div class="saved-recording-meta">
-            ${recording.steps.length} steps • ${dateStr}
+            ${recording.steps.length} step${recording.steps.length !== 1 ? 's' : ''} • ${dateStr}${hasScreenshots ? ` • ${ICONS.camera}` : ''}
           </div>
+          ${tagHtml}
         </div>
         <div class="saved-recording-actions">
-          <button class="btn-load-recording" data-id="${recording.id}" title="Load this recording">📂 Load</button>
-          <button class="btn-delete-recording" data-id="${recording.id}" title="Delete this recording">🗑️</button>
+          <button class="btn-copy-saved" data-id="${recording.id}" data-js-tooltip="Copy Steps">${ICONS.clipboard}</button>
+          <button class="btn-preview-saved" data-id="${recording.id}" data-js-tooltip="Preview">${ICONS.eye}</button>
+          <button class="btn-report-saved" data-id="${recording.id}" data-js-tooltip="Download Report">${ICONS.download}</button>
+          <button class="btn-load-recording" data-id="${recording.id}" data-js-tooltip="Load">${ICONS.folder}</button>
+          <button class="btn-delete-recording" data-id="${recording.id}" data-js-tooltip="Delete">${ICONS.trash}</button>
         </div>
       </div>
     `;
   }).join('');
-  
-  // Add event listeners
-  document.querySelectorAll('.btn-load-recording').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const id = e.target.dataset.id;
-      loadRecording(id);
+
+  // Search filter
+  const savedSearchInput = document.getElementById('savedSearchInput');
+  if (savedSearchInput) {
+    // Remove old listener by replacing the element value approach
+    savedSearchInput.oninput = applyRecordingFilters;
+  }
+
+  // Attach event listeners — use data-id to look up the full recording object
+  const findRecording = (id) => recordings.find(r => r.id === id);
+
+  document.querySelectorAll('.btn-copy-saved').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const recording = findRecording(e.target.dataset.id);
+      if (!recording) return;
+      const text = formatStepsForJira(recording.steps);
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      }
+      const orig = btn.innerHTML;
+      btn.innerHTML = ICONS.check; btn.style.background = '#4CAF50'; btn.style.color = 'white';
+      setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; }, 2000);
     });
   });
-  
+
+  document.querySelectorAll('.btn-preview-saved').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const recording = findRecording(e.target.dataset.id);
+      if (!recording) return;
+      const formatted = formatStepsForClipboardWithScreenshots(recording.steps);
+      const previewWindow = window.open('', '_blank', 'width=1000,height=800');
+      if (previewWindow) {
+        previewWindow.document.write(formatted.html);
+        previewWindow.document.close();
+      } else {
+        alert('Please allow popups to open the preview window');
+      }
+    });
+  });
+
+  document.querySelectorAll('.btn-report-saved').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const recording = findRecording(e.target.dataset.id);
+      if (!recording) return;
+      downloadHtmlReport(recording.steps);
+    });
+  });
+
+  document.querySelectorAll('.btn-load-recording').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      loadRecording(e.target.dataset.id);
+    });
+  });
+
   document.querySelectorAll('.btn-delete-recording').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const id = e.target.dataset.id;
@@ -133,6 +347,19 @@ function displaySavedRecordings(recordings) {
         });
       }
     });
+  });
+}
+
+// Apply search + tag filters to saved recording items
+function applyRecordingFilters() {
+  const savedSearchInput = document.getElementById('savedSearchInput');
+  const searchText = savedSearchInput ? savedSearchInput.value.toLowerCase() : '';
+  document.querySelectorAll('.saved-recording-item').forEach(item => {
+    const name = (item.dataset.recordingName || '').toLowerCase();
+    const tags = (item.dataset.recordingTags || '').toLowerCase();
+    const matchesSearch = !searchText || name.includes(searchText) || tags.includes(searchText);
+    const matchesTag = !activeTagFilter || tags.split(',').map(t => t.trim()).includes(activeTagFilter.toLowerCase());
+    item.style.display = matchesSearch && matchesTag ? '' : 'none';
   });
 }
 
@@ -167,11 +394,37 @@ function loadRecording(id) {
 }
 
 // Start recording
-startBtn.addEventListener('click', () => {
+startBtn.addEventListener('click', async () => {
   // Check if we should clear existing steps (ask user if there are existing steps)
   const shouldClear = steps.length === 0 || confirm('Start a new recording? This will clear existing steps.');
-  
-  chrome.runtime.sendMessage({ 
+
+  // Start video recording if enabled (must be triggered by user gesture — do it here)
+  if (videoRecordingEnabled) {
+    try {
+      videoStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 15, max: 30 }, cursor: 'always' },
+        audio: false
+      });
+      videoChunks = [];
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+      mediaRecorder = new MediaRecorder(videoStream, { mimeType });
+      mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) videoChunks.push(e.data); };
+      mediaRecorder.start(1000); // 1-second chunks for smoother progress
+      videoBtn.innerHTML = ICONS.dot + ' Recording';
+      videoBtn.classList.add('btn-video-active');
+      // If user stops sharing screen externally, handle gracefully
+      videoStream.getVideoTracks()[0].onended = () => {
+        stopVideoRecording(true);
+      };
+    } catch (err) {
+      console.warn('Video recording not started (user cancelled or denied):', err.message);
+      // Don't block step recording if video fails
+    }
+  }
+
+  chrome.runtime.sendMessage({
     action: 'startRecording',
     clearSteps: shouldClear // Explicitly pass true or false, never undefined
   }, (response) => {
@@ -256,8 +509,10 @@ if (stopBtn) {
       isPaused = false;
       steps = response.steps || [];
       console.log('Recording stopped, steps:', steps.length);
+      // Stop video recording if active
+      stopVideoRecording(false);
       updateUI();
-      
+
       // Show copy notification if there are steps - use setTimeout to ensure UI is updated first
       if (steps.length > 0) {
         console.log('✓ Recording stopped with', steps.length, 'steps. Will show notification...');
@@ -307,7 +562,7 @@ pauseBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'resumeRecording' }, (response) => {
       if (response && response.success) {
         isPaused = false;
-        pauseBtn.textContent = 'Pause';
+        pauseBtn.innerHTML = ICONS.pause + ' Pause';
         pauseBtn.classList.remove('btn-warning');
         pauseBtn.classList.add('btn-warning');
         updateUI();
@@ -317,7 +572,7 @@ pauseBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'pauseRecording' }, (response) => {
       if (response && response.success) {
         isPaused = true;
-        pauseBtn.textContent = 'Resume';
+        pauseBtn.innerHTML = ICONS.play + ' Resume';
         updateUI();
       }
     });
@@ -349,9 +604,11 @@ undoBtn.addEventListener('click', () => {
 });
 
 // Save recording
+const recordingTagsInput = document.getElementById('recordingTagsInput');
 saveBtn.addEventListener('click', () => {
   if (steps.length > 0) {
     recordingNameInput.value = `Recording ${new Date().toLocaleString()}`;
+    if (recordingTagsInput) recordingTagsInput.value = '';
     saveModal.style.display = 'block';
     recordingNameInput.focus();
   }
@@ -364,35 +621,44 @@ confirmSaveBtn.addEventListener('click', () => {
     alert('Please enter a name for the recording');
     return;
   }
-  
-  chrome.runtime.sendMessage({ 
-    action: 'saveRecording', 
+
+  // Parse tags from input
+  const tagsRaw = recordingTagsInput ? recordingTagsInput.value : '';
+  const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean);
+
+  chrome.runtime.sendMessage({
+    action: 'saveRecording',
     name: name,
-    steps: steps 
+    steps: steps,
+    tags: tags
   }, (response) => {
     if (response && response.success) {
       saveModal.style.display = 'none';
       loadSavedRecordings();
-      // Show confirmation
+      const msg = response.note ? `Saved (screenshots not stored — use Report to get them)` : 'Recording saved';
       const confirmMsg = document.createElement('div');
-      confirmMsg.textContent = '✓ Recording saved';
+      confirmMsg.textContent = msg;
       confirmMsg.style.cssText = `
         position: fixed;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: #4CAF50;
+        background: ${response.note ? '#ff9800' : '#4CAF50'};
         color: white;
         padding: 12px 24px;
         border-radius: 6px;
         font-family: Arial, sans-serif;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: bold;
         z-index: 1000000;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        max-width: 320px;
+        text-align: center;
       `;
       document.body.appendChild(confirmMsg);
-      setTimeout(() => confirmMsg.remove(), 2000);
+      setTimeout(() => confirmMsg.remove(), 3000);
+    } else if (response && !response.success) {
+      alert(`Failed to save recording: ${response.error || 'Unknown error'}. Try clearing old recordings to free up space.`);
     }
   });
 });
@@ -417,10 +683,24 @@ refreshSavedBtn.addEventListener('click', () => {
   loadSavedRecordings();
 });
 
+// Delete All steps
+if (deleteAllBtn) {
+  deleteAllBtn.addEventListener('click', () => {
+    if (steps.length === 0) return;
+    if (confirm(`Delete all ${steps.length} recorded step${steps.length !== 1 ? 's' : ''}? This cannot be undone.`)) {
+      chrome.runtime.sendMessage({ action: 'clearSteps' }, (response) => {
+        if (response && response.success) {
+          steps = [];
+          updateUI();
+        }
+      });
+    }
+  });
+}
+
 // Edit Mode toggle
 editModeBtn.addEventListener('click', () => {
   isEditMode = !isEditMode;
-  editModeBtn.textContent = isEditMode ? '✓ Edit Mode' : '✏️ Edit Mode';
   editModeBtn.classList.toggle('btn-active', isEditMode);
   updateUI();
 });
@@ -470,7 +750,7 @@ function renderEditSteps() {
   editStepsList.innerHTML = steps.map((step, index) => {
     return `
       <div class="edit-step-item" data-index="${index}">
-        <div class="edit-step-handle" title="Drag to reorder">☰</div>
+        <div class="edit-step-handle" title="Drag to reorder">${ICONS.grip}</div>
         <div class="edit-step-number">${index + 1}</div>
         <div class="edit-step-fields">
           <div class="edit-field-group">
@@ -491,7 +771,7 @@ function renderEditSteps() {
           </div>
         </div>
         <div class="edit-step-actions">
-          <button class="btn-delete-step-inline" data-index="${index}" title="Delete step">🗑️</button>
+          <button class="btn-delete-step-inline" data-index="${index}" title="Delete step">${ICONS.trash}</button>
         </div>
       </div>
     `;
@@ -585,7 +865,7 @@ addStepBtn.addEventListener('click', () => {
 // Reorder steps
 reorderStepsBtn.addEventListener('click', () => {
   isReordering = !isReordering;
-  reorderStepsBtn.textContent = isReordering ? '✓ Done Reordering' : '🔄 Reorder';
+  reorderStepsBtn.innerHTML = isReordering ? (ICONS.check + ' Done Reordering') : (ICONS.refresh + ' Reorder');
   reorderStepsBtn.classList.toggle('btn-active', isReordering);
   
   document.querySelectorAll('.edit-step-item').forEach(item => {
@@ -703,7 +983,7 @@ if (downloadScreenshotsBtn) {
     
     // Disable button during download
     downloadScreenshotsBtn.disabled = true;
-    const originalText = downloadScreenshotsBtn.textContent;
+    const originalText = downloadScreenshotsBtn.innerHTML;
     downloadScreenshotsBtn.textContent = 'Downloading...';
     
     // Download each screenshot with a delay to avoid browser blocking
@@ -748,10 +1028,10 @@ if (downloadScreenshotsBtn) {
     
     // Re-enable button and show feedback
     downloadScreenshotsBtn.disabled = false;
-    downloadScreenshotsBtn.textContent = '✓ Downloaded!';
+    downloadScreenshotsBtn.innerHTML = ICONS.check + ' Downloaded!';
     downloadScreenshotsBtn.style.background = '#4CAF50';
     setTimeout(() => {
-      downloadScreenshotsBtn.textContent = originalText;
+      downloadScreenshotsBtn.innerHTML = originalText;
       downloadScreenshotsBtn.style.background = '';
     }, 2000);
   });
@@ -781,144 +1061,225 @@ if (openPreviewBtn) {
 // Copy to clipboard (from export modal)
 copyBtn.addEventListener('click', async () => {
   const format = formatSelector.value;
-  
-  // For Jira format, try to copy with screenshots
   if (format === 'jira') {
-    const formatted = formatStepsForClipboardWithScreenshots(steps);
-    const jiraText = jiraOutput.value;
-    
-    // Use modern Clipboard API to copy both HTML (with images) and plain text
-    if (navigator.clipboard && navigator.clipboard.write) {
-      try {
-        const clipboardItem = new ClipboardItem({
-          'text/html': new Blob([formatted.html], { type: 'text/html' }),
-          'text/plain': new Blob([jiraText], { type: 'text/plain' })
-        });
-        
-        await navigator.clipboard.write([clipboardItem]);
-  
-  // Show feedback
-        const originalText = copyBtn.textContent;
-        copyBtn.textContent = '✓ Copied!';
+    // Rich HTML copy (includes screenshots)
+    await copyStepsWithImages(steps, copyBtn);
+  } else {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(jiraOutput.value).then(() => {
+        const orig = copyBtn.innerHTML;
+        copyBtn.innerHTML = ICONS.check + ' Copied!';
         copyBtn.style.background = '#4CAF50';
-        setTimeout(() => {
-          copyBtn.textContent = originalText;
-          copyBtn.style.background = '';
-        }, 2000);
-        return;
-      } catch (err) {
-        console.error('Failed to copy with images:', err);
-        // Fall through to text-only fallback
-      }
-    }
-  }
-  
-  // Fallback to text-only copy
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(jiraOutput.value).then(() => {
-      const originalText = copyBtn.textContent;
-      copyBtn.textContent = '✓ Copied!';
-      copyBtn.style.background = '#4CAF50';
-      setTimeout(() => {
-        copyBtn.textContent = originalText;
-        copyBtn.style.background = '';
-      }, 2000);
-    }).catch(() => {
-      // Final fallback
+        setTimeout(() => { copyBtn.innerHTML = orig; copyBtn.style.background = ''; }, 2000);
+      }).catch(() => { jiraOutput.select(); document.execCommand('copy'); });
+    } else {
       jiraOutput.select();
       document.execCommand('copy');
-  const originalText = copyBtn.textContent;
-  copyBtn.textContent = '✓ Copied!';
-  copyBtn.style.background = '#4CAF50';
-  setTimeout(() => {
-    copyBtn.textContent = originalText;
-    copyBtn.style.background = '';
-  }, 2000);
-    });
-  } else {
-    // Final fallback
-    jiraOutput.select();
-    document.execCommand('copy');
-    const originalText = copyBtn.textContent;
-    copyBtn.textContent = '✓ Copied!';
-    copyBtn.style.background = '#4CAF50';
-    setTimeout(() => {
-      copyBtn.textContent = originalText;
-      copyBtn.style.background = '';
-    }, 2000);
+    }
   }
 });
 
-// Copy steps directly to clipboard (quick copy button)
+// Copy steps directly to clipboard (quick copy button) — includes screenshots
 copyStepsBtn.addEventListener('click', async () => {
   if (steps.length === 0) {
     alert('No steps to copy');
     return;
   }
-  
-  // Get Jira format which now includes {html} tags with base64 images
-  const jiraText = formatStepsForJira(steps);
-  
-  // Also create HTML version for clipboard
-  const formatted = formatStepsForClipboardWithScreenshots(steps);
-  
-  // Use modern Clipboard API to copy both HTML (with images) and plain text
-  // The plain text includes {html} tags which Jira might render
+  await copyStepsWithImages(steps, copyStepsBtn);
+});
+
+// Download HTML report with all screenshots embedded
+if (downloadReportBtn) {
+  downloadReportBtn.addEventListener('click', () => {
+    if (steps.length === 0) {
+      alert('No steps to export');
+      return;
+    }
+    downloadHtmlReport(steps);
+  });
+}
+
+// Generate and download a self-contained HTML report with embedded screenshots
+function downloadHtmlReport(stepsData) {
+  const formatted = formatStepsForClipboardWithScreenshots(stepsData, true);
+  const title = `${reportTitle} — ${new Date().toLocaleString()}`;
+  const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body { margin: 0; padding: 30px 40px; font-family: Arial, sans-serif; background: #f4f5f7; color: #333; }
+    .report-wrapper { max-width: 960px; margin: 0 auto; background: white; border-radius: 8px; padding: 30px 40px; box-shadow: 0 2px 12px rgba(0,0,0,.1); }
+    h2 { color: #0052CC; border-bottom: 2px solid #0052CC; padding-bottom: 8px; }
+    img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; margin: 10px 0; display: block; }
+    @media print { body { background: white; padding: 0; } .report-wrapper { box-shadow: none; padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="report-wrapper">
+    <p style="color:#666;font-size:13px;margin-bottom:20px;">Generated by Jira Step Recorder &nbsp;•&nbsp; ${escapeHtml(new Date().toLocaleString())}</p>
+    ${formatted.html}
+  </div>
+</body>
+</html>`;
+  const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `step-recording-${Date.now()}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  // Brief feedback
+  if (downloadReportBtn) {
+    const orig = downloadReportBtn.innerHTML;
+    downloadReportBtn.innerHTML = ICONS.check + ' Downloaded!';
+    downloadReportBtn.style.background = '#4CAF50';
+    downloadReportBtn.style.color = 'white';
+    setTimeout(() => { downloadReportBtn.innerHTML = orig; downloadReportBtn.style.background = ''; downloadReportBtn.style.color = ''; }, 2000);
+  }
+}
+
+// Shared helper: copy steps as rich HTML (with images) + plain text fallback
+async function copyStepsWithImages(stepsData, feedbackBtn) {
+  const jiraText = formatStepsForJira(stepsData);
+  const formatted = formatStepsForClipboardWithScreenshots(stepsData);
+
+  const showSuccess = () => {
+    if (feedbackBtn) {
+      const orig = feedbackBtn.innerHTML;
+      feedbackBtn.innerHTML = ICONS.check + ' Copied!';
+      feedbackBtn.style.background = '#4CAF50';
+      setTimeout(() => { feedbackBtn.innerHTML = orig; feedbackBtn.style.background = ''; }, 2000);
+    }
+    showJiraGuidePanel(stepsData);
+  };
+
+  // Try ClipboardItem (HTML + plain text — images included in HTML)
   if (navigator.clipboard && navigator.clipboard.write) {
     try {
       const clipboardItem = new ClipboardItem({
         'text/html': new Blob([formatted.html], { type: 'text/html' }),
         'text/plain': new Blob([jiraText], { type: 'text/plain' })
       });
-      
       await navigator.clipboard.write([clipboardItem]);
-      
-      // Show feedback
-      const originalText = copyStepsBtn.textContent;
-      copyStepsBtn.textContent = '✓ Copied!';
-      copyStepsBtn.style.background = '#4CAF50';
-      setTimeout(() => {
-        copyStepsBtn.textContent = originalText;
-        copyStepsBtn.style.background = '';
-      }, 2000);
+      showSuccess();
+      return;
     } catch (err) {
-      console.error('Failed to copy with images:', err);
-      // Fallback to text-only copy (which includes {html} tags)
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(jiraText).then(() => {
-          const originalText = copyStepsBtn.textContent;
-          copyStepsBtn.textContent = '✓ Copied!';
-          copyStepsBtn.style.background = '#4CAF50';
-          setTimeout(() => {
-            copyStepsBtn.textContent = originalText;
-            copyStepsBtn.style.background = '';
-          }, 2000);
-        }).catch(() => {
-          copyToClipboardFallback(jiraText);
-        });
-      } else {
-        copyToClipboardFallback(jiraText);
-      }
+      console.log('ClipboardItem failed, trying execCommand:', err.message);
     }
-  } else if (navigator.clipboard && navigator.clipboard.writeText) {
-    // Fallback to text-only if ClipboardItem not supported
-    // The text includes {html} tags with base64 images
-    navigator.clipboard.writeText(jiraText).then(() => {
-      const originalText = copyStepsBtn.textContent;
-      copyStepsBtn.textContent = '✓ Copied!';
-      copyStepsBtn.style.background = '#4CAF50';
-      setTimeout(() => {
-        copyStepsBtn.textContent = originalText;
-        copyStepsBtn.style.background = '';
-      }, 2000);
-    }).catch(() => {
-      copyToClipboardFallback(jiraText);
-    });
-  } else {
-    // Final fallback to execCommand
-    copyToClipboardFallback(jiraText);
   }
-});
+
+  // Fallback: contenteditable + execCommand — copies rich HTML including base64 images
+  // NOTE: div must have real dimensions so images are rendered before selection+copy
+  try {
+    const tempDiv = document.createElement('div');
+    tempDiv.contentEditable = 'true';
+    // Position off-screen but with real width so browser renders images
+    tempDiv.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0.01;width:900px;max-height:10000px;overflow:visible;pointer-events:none;';
+    tempDiv.innerHTML = formatted.html;
+    document.body.appendChild(tempDiv);
+    // Small delay to allow browser to lay out / decode base64 images
+    await new Promise(r => setTimeout(r, 50));
+    const range = document.createRange();
+    range.selectNodeContents(tempDiv);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.execCommand('copy');
+    document.body.removeChild(tempDiv);
+    selection.removeAllRanges();
+    showSuccess();
+  } catch (err) {
+    console.error('execCommand copy failed:', err);
+    copyToClipboardFallback(jiraText, feedbackBtn);
+    showSuccess();
+  }
+}
+
+// Jira Paste Guide Panel — shown after a successful clipboard copy
+function showJiraGuidePanel(stepsData) {
+  const panel = document.getElementById('jiraGuidePanel');
+  if (!panel) return;
+
+  // Only include steps that have screenshots
+  const screenshotSteps = stepsData
+    .map((step, originalIndex) => ({ step, originalIndex }))
+    .filter(({ step }) => step.screenshot);
+
+  if (screenshotSteps.length === 0) {
+    // No screenshots — don't show the panel
+    panel.style.display = 'none';
+    return;
+  }
+
+  // Build step label for display
+  function stepLabel(step) {
+    const parts = [step.action];
+    if (step.element) parts.push(step.element);
+    if (step.value) parts.push(`"${step.value.substring(0, 30)}${step.value.length > 30 ? '…' : ''}"`);
+    return parts.join(' — ');
+  }
+
+  const stepsHtml = screenshotSteps.map(({ step, originalIndex }) => `
+    <div class="jira-guide-step">
+      <span class="jira-guide-step-num">${originalIndex + 1}</span>
+      <span class="jira-guide-step-text" title="${stepLabel(step).replace(/"/g, '&quot;')}">${stepLabel(step)}</span>
+      <img class="jira-guide-thumb" src="${step.screenshot}" alt="Step ${originalIndex + 1}" title="Step ${originalIndex + 1} screenshot">
+      <button class="btn-jira-guide-copy" data-index="${originalIndex}">${ICONS.camera} Copy</button>
+    </div>
+  `).join('');
+
+  panel.innerHTML = `
+    <div class="jira-guide-header">
+      <span class="jira-guide-success">✓ Steps copied! Now paste text in Jira, then add screenshots below:</span>
+      <button class="jira-guide-close" id="jiraGuidePanelClose" title="Dismiss">✕</button>
+    </div>
+    ${stepsHtml}
+  `;
+
+  panel.style.display = 'block';
+
+  // Close button
+  const closeBtn = document.getElementById('jiraGuidePanelClose');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
+  }
+
+  // Per-step copy buttons (same logic as .btn-copy-screenshot)
+  panel.querySelectorAll('.btn-jira-guide-copy').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const index = parseInt(e.currentTarget.dataset.index);
+      const step = stepsData[index];
+      if (!step || !step.screenshot) return;
+      const originalText = btn.innerHTML;
+      try {
+        const res = await fetch(step.screenshot);
+        const blob = await res.blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({ [blob.type]: blob })
+        ]);
+        btn.innerHTML = ICONS.check;
+        btn.style.background = '#4CAF50';
+      } catch (err) {
+        console.warn('Jira guide clipboard write failed, opening in new tab:', err);
+        const tab = window.open('', '_blank');
+        if (tab) {
+          tab.document.write(`<img src="${step.screenshot}" style="max-width:100%;cursor:pointer;" title="Right-click → Copy Image, then paste into Jira">`);
+          tab.document.title = `Step ${index + 1} Screenshot`;
+        }
+        btn.innerHTML = ICONS.upload;
+      }
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.style.background = '';
+      }, 3000);
+    });
+  });
+}
 
 // Show copy notification after stopping recording
 let notificationTimeout = null;
@@ -933,6 +1294,20 @@ chrome.storage.local.get(['notificationTimeout'], (result) => {
     notificationTimeoutInput.value = notificationTimeoutSeconds;
   }
 });
+
+// Configurable document title used across all export formats (e.g. "Execution Steps")
+let reportTitle = 'Execution Steps';
+chrome.storage.local.get(['reportTitle'], (result) => {
+  if (result.reportTitle) reportTitle = result.reportTitle;
+  if (reportTitleInput) reportTitleInput.value = reportTitle;
+});
+if (reportTitleInput) {
+  reportTitleInput.addEventListener('input', () => {
+    reportTitle = reportTitleInput.value.trim() || 'Execution Steps';
+    chrome.storage.local.set({ reportTitle: reportTitle });
+    updateExportOutput();
+  });
+}
 
 function showCopyNotification() {
   console.log('=== showCopyNotification called ===');
@@ -1058,11 +1433,8 @@ function hideCopyNotification() {
 
 // Copy button in notification
 if (copyNotificationBtn) {
-  copyNotificationBtn.addEventListener('click', () => {
-    // Trigger the same copy action as the main copy button
-    if (copyStepsBtn && !copyStepsBtn.disabled) {
-      copyStepsBtn.click();
-    }
+  copyNotificationBtn.addEventListener('click', async () => {
+    await copyStepsWithImages(steps, copyNotificationBtn);
     hideCopyNotification();
   });
 }
@@ -1098,6 +1470,13 @@ if (settingsBtn) {
       if (notificationTimeoutInput) {
         notificationTimeoutInput.value = notificationTimeoutSeconds;
       }
+      // Load ignore patterns
+      const ignorePatternsInput = document.getElementById('ignorePatternsInput');
+      if (ignorePatternsInput) {
+        chrome.storage.local.get(['ignorePatterns'], (result) => {
+          ignorePatternsInput.value = (result.ignorePatterns || []).join('\n');
+        });
+      }
     }
   });
 }
@@ -1126,11 +1505,13 @@ if (saveSettingsBtn) {
       const newTimeout = parseInt(notificationTimeoutInput.value) || 20;
       if (newTimeout >= 5 && newTimeout <= 120) {
         notificationTimeoutSeconds = newTimeout;
-        chrome.storage.local.set({ notificationTimeout: newTimeout }, () => {
+        const ignorePatternsInput = document.getElementById('ignorePatternsInput');
+        const ignorePatterns = ignorePatternsInput ? ignorePatternsInput.value.split('\n').filter(Boolean) : [];
+        chrome.storage.local.set({ notificationTimeout: newTimeout, ignorePatterns: ignorePatterns }, () => {
           if (settingsModal) {
             settingsModal.style.display = 'none';
           }
-          alert(`Notification timeout set to ${newTimeout} seconds`);
+          alert(`Settings saved`);
         });
       } else {
         alert('Please enter a value between 5 and 120 seconds');
@@ -1146,28 +1527,26 @@ window.addEventListener('click', (event) => {
   }
 });
 
-// Fallback copy function using execCommand
-function copyToClipboardFallback(text) {
+// Fallback copy function using execCommand (plain text)
+function copyToClipboardFallback(text, feedbackBtn) {
   const textarea = document.createElement('textarea');
   textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
+  textarea.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
   document.body.appendChild(textarea);
   textarea.select();
-  
+
   try {
     document.execCommand('copy');
-    // Show feedback
-    const originalText = copyStepsBtn.textContent;
-    copyStepsBtn.textContent = '✓ Copied!';
-    copyStepsBtn.style.background = '#4CAF50';
-    setTimeout(() => {
-      copyStepsBtn.textContent = originalText;
-      copyStepsBtn.style.background = '';
-    }, 2000);
+    const btn = feedbackBtn || copyStepsBtn;
+    if (btn) {
+      const originalText = btn.innerHTML;
+      btn.innerHTML = ICONS.check + ' Copied!';
+      btn.style.background = '#4CAF50';
+      setTimeout(() => { btn.innerHTML = originalText; btn.style.background = ''; }, 2000);
+    }
   } catch (err) {
     console.error('Failed to copy:', err);
-    alert('Failed to copy to clipboard. Please try using the Export button.');
+    alert('Failed to copy to clipboard. Please use the Export or Download Report button.');
   } finally {
     document.body.removeChild(textarea);
   }
@@ -1207,37 +1586,43 @@ function updateUI() {
   clearBtn.disabled = steps.length === 0;
   
   if (isPaused) {
-    pauseBtn.textContent = 'Resume';
+    pauseBtn.innerHTML = ICONS.play + ' Resume';
     pauseBtn.classList.add('btn-success');
     pauseBtn.classList.remove('btn-warning');
   } else {
-    pauseBtn.textContent = 'Pause';
+    pauseBtn.innerHTML = ICONS.pause + ' Pause';
     pauseBtn.classList.remove('btn-success');
     pauseBtn.classList.add('btn-warning');
   }
   
   // Update status
+  const headerSubtitle = document.getElementById('headerSubtitle');
   if (isPaused) {
-    statusText.textContent = '⏸️ Paused';
+    statusText.innerHTML = ICONS.pause + ' Paused';
     statusText.style.color = '#ffa500';
+    if (headerSubtitle) headerSubtitle.textContent = 'Recording paused';
   } else if (isRecording) {
-    statusText.textContent = '🔴 Recording...';
+    statusText.innerHTML = ICONS.dot + ' Recording...';
     statusText.style.color = '#ff4444';
+    if (headerSubtitle) headerSubtitle.innerHTML = ICONS.dot + ' Recording in progress';
   } else {
     statusText.textContent = 'Ready to record';
     statusText.style.color = '#666';
+    if (headerSubtitle) headerSubtitle.textContent = steps.length > 0 ? `${steps.length} step${steps.length !== 1 ? 's' : ''} captured` : 'Ready to capture your workflow';
   }
   
   // Update step count
   stepCount.textContent = steps.length > 0 ? `${steps.length} step${steps.length !== 1 ? 's' : ''}` : '';
   
-  // Show/hide copy steps button - show when not recording and there are steps
-  if (copyStepsBtn) {
-    if (!isRecording && steps.length > 0) {
-      copyStepsBtn.style.display = 'inline-block';
-    } else {
-      copyStepsBtn.style.display = 'none';
-    }
+  // Show/hide footer action bar (Copy + Export) — visible whenever there are steps
+  if (stepsFooter) {
+    stepsFooter.style.display = steps.length > 0 ? 'flex' : 'none';
+  }
+
+  // Hide Jira guide panel when steps are cleared or recording restarts
+  if (steps.length === 0) {
+    const jiraGuidePanel = document.getElementById('jiraGuidePanel');
+    if (jiraGuidePanel) jiraGuidePanel.style.display = 'none';
   }
   
   // Update steps list
@@ -1246,8 +1631,13 @@ function updateUI() {
   } else {
     stepsList.innerHTML = steps.map((step, index) => {
       const isEditing = editingStepIndex === index;
+      let hostname = '';
+      try { hostname = new URL(step.url).hostname; } catch(e) { hostname = step.url; }
+      const truncatedUrl = hostname.length > 30 ? hostname.substring(0, 30) + '…' : hostname;
+      const hasScreenshot = !!step.screenshot;
       return `
-      <div class="step-item" data-step-index="${index}">
+      <div class="step-item${hasScreenshot ? ' step-has-screenshot' : ''}" data-step-index="${index}">
+        <div class="step-drag-handle" draggable="true" data-index="${index}" title="Drag to reorder">${ICONS.grip}</div>
         <div class="step-number">${index + 1}</div>
         <div class="step-content">
           ${isEditing ? `
@@ -1263,14 +1653,27 @@ function updateUI() {
             </div>
           ` : `
             <div class="step-display">
-              <div class="step-action">${step.action}</div>
-              <div class="step-element">${step.element}</div>
-              ${step.value ? `<div class="step-value">Value: ${step.value}</div>` : ''}
-              <div class="step-url">${new URL(step.url).hostname}</div>
+              <div class="step-action">${escapeHtml(step.action)}${hasScreenshot ? ` <span class="step-screenshot-badge" data-screenshot-index="${index}" title="">${ICONS.camera}</span>` : ''}</div>
+              <div class="step-element">${escapeHtml(step.element || '')}</div>
+              ${step.value && step.value !== '***' ? `<div class="step-value">${escapeHtml(step.value.length > 40 ? step.value.substring(0, 40) + '…' : step.value)}</div>` : ''}
+              ${step.value === '***' ? `<div class="step-value">●●●●●● (password)</div>` : ''}
+              <div class="step-url" title="${escapeHtml(step.url)}">${escapeHtml(truncatedUrl)}</div>
+              ${step.note ? `<div class="step-note">${ICONS.note} ${escapeHtml(step.note)}</div>` : ''}
+              ${editingNoteIndex === index ? `
+                <div class="step-note-editor">
+                  <textarea class="step-note-input" data-index="${index}" placeholder="Add a note for this step...">${escapeHtml(step.note || '')}</textarea>
+                  <div class="step-note-actions">
+                    <button class="btn-note-save" data-index="${index}">Save</button>
+                    <button class="btn-note-cancel" data-index="${index}">Cancel</button>
+                  </div>
+                </div>
+              ` : ''}
             </div>
             <div class="step-actions">
-              <button class="btn-edit" data-index="${index}" title="Edit step">✏️</button>
-              <button class="btn-delete-step" data-index="${index}" title="Delete step">🗑️</button>
+              ${hasScreenshot ? `<button class="btn-copy-screenshot" data-index="${index}" data-tooltip="Copy Image">${ICONS.camera}</button>` : ''}
+              <button class="btn-add-note" data-index="${index}" data-tooltip="${step.note ? 'Edit Note' : 'Add Note'}">${ICONS.note}</button>
+              <button class="btn-edit" data-index="${index}" data-tooltip="Edit">${ICONS.pencil}</button>
+              <button class="btn-delete-step" data-index="${index}" data-tooltip="Delete">${ICONS.trash}</button>
             </div>
           `}
         </div>
@@ -1283,6 +1686,7 @@ function updateUI() {
       btn.addEventListener('click', (e) => {
         const index = parseInt(e.target.dataset.index);
         editingStepIndex = index;
+        editingNoteIndex = null; // close note editor if open
         updateUI();
       });
     });
@@ -1332,6 +1736,87 @@ function updateUI() {
         updateUI();
       });
     });
+
+    // Note button listeners
+    document.querySelectorAll('.btn-add-note').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const index = parseInt(e.target.dataset.index);
+        editingNoteIndex = editingNoteIndex === index ? null : index;
+        updateUI();
+        // Focus the textarea after render
+        if (editingNoteIndex === index) {
+          setTimeout(() => {
+            const ta = document.querySelector(`.step-note-input[data-index="${index}"]`);
+            if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+          }, 30);
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-note-save').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const index = parseInt(e.target.dataset.index);
+        const ta = document.querySelector(`.step-note-input[data-index="${index}"]`);
+        const noteValue = ta ? ta.value.trim() : '';
+        chrome.runtime.sendMessage({
+          action: 'updateStep',
+          index: index,
+          step: { ...steps[index], note: noteValue || null }
+        }, (response) => {
+          if (response && response.success) {
+            steps = response.steps || [];
+            editingNoteIndex = null;
+            updateUI();
+          }
+        });
+      });
+    });
+
+    document.querySelectorAll('.btn-note-cancel').forEach(btn => {
+      btn.addEventListener('click', () => {
+        editingNoteIndex = null;
+        updateUI();
+      });
+    });
+
+    // Copy individual screenshot as image/png (works in Jira — Jira strips base64 HTML but accepts raw image clipboard)
+    document.querySelectorAll('.btn-copy-screenshot').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const index = parseInt(e.target.dataset.index);
+        const step = steps[index];
+        if (!step || !step.screenshot) return;
+        const originalText = btn.innerHTML;
+        try {
+          // Convert data URL → Blob
+          const res = await fetch(step.screenshot);
+          const blob = await res.blob();
+          // Write as image/png — this is what Jira accepts when you paste an image
+          await navigator.clipboard.write([
+            new ClipboardItem({ [blob.type]: blob })
+          ]);
+          btn.innerHTML = ICONS.check;
+          btn.style.background = '#4CAF50';
+          btn.style.color = 'white';
+          btn.title = 'Screenshot copied! Now click inside Jira description and press Ctrl+V / ⌘V';
+        } catch (err) {
+          // Fallback: open the screenshot in a new tab so user can right-click → copy
+          console.warn('Clipboard write failed, opening image in new tab:', err);
+          const tab = window.open('', '_blank');
+          if (tab) {
+            tab.document.write(`<img src="${step.screenshot}" style="max-width:100%;cursor:pointer;" title="Right-click → Copy Image, then paste into Jira">`);
+            tab.document.title = `Step ${index + 1} Screenshot`;
+          }
+          btn.innerHTML = ICONS.upload;
+          btn.title = 'Opened in new tab — right-click the image → Copy Image → paste into Jira';
+        }
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+          btn.style.background = '';
+          btn.style.color = '';
+          btn.title = 'Copy screenshot to clipboard — then paste it directly into Jira';
+        }, 3000);
+      });
+    });
     
     document.querySelectorAll('.btn-edit-delete').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1347,19 +1832,81 @@ function updateUI() {
         }
       });
     });
+
+    // ── Drag-and-drop step reordering ──────────────────────────────
+    let dragSrcIndex = null;
+    document.querySelectorAll('.step-drag-handle').forEach(handle => {
+      handle.addEventListener('dragstart', e => {
+        dragSrcIndex = parseInt(handle.dataset.index);
+        handle.closest('.step-item').classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+    });
+    document.querySelectorAll('.step-item').forEach(item => {
+      item.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        item.classList.add('drag-over');
+      });
+      item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+      item.addEventListener('drop', e => {
+        e.preventDefault();
+        const destIndex = parseInt(item.dataset.stepIndex);
+        item.classList.remove('drag-over');
+        if (dragSrcIndex === null || dragSrcIndex === destIndex) return;
+        const newSteps = [...steps];
+        const [moved] = newSteps.splice(dragSrcIndex, 1);
+        newSteps.splice(destIndex, 0, moved);
+        chrome.runtime.sendMessage({ action: 'updateAllSteps', steps: newSteps }, r => {
+          if (r && r.success) { steps = newSteps; updateUI(); }
+        });
+      });
+      item.addEventListener('dragend', () => {
+        document.querySelectorAll('.step-item').forEach(i => i.classList.remove('dragging', 'drag-over'));
+        dragSrcIndex = null;
+      });
+    });
+
+    // ── Screenshot hover preview (Feature 7) ─────────────────────
+    const imgTip = document.getElementById('js-tooltip-img');
+    const imgTipSrc = document.getElementById('js-tooltip-img-src');
+    if (imgTip && imgTipSrc) {
+      document.querySelectorAll('[data-screenshot-index]').forEach(badge => {
+        badge.addEventListener('mouseover', () => {
+          const idx = parseInt(badge.dataset.screenshotIndex);
+          const step = steps[idx];
+          if (!step || !step.screenshot) return;
+          imgTipSrc.src = step.screenshot;
+          imgTip.style.display = 'block';
+          const r = badge.getBoundingClientRect();
+          let top = r.bottom + 6;
+          if (top + 220 > window.innerHeight) top = r.top - 220 - 6;
+          let left = r.left - 80;
+          left = Math.max(4, Math.min(left, window.innerWidth - 220));
+          imgTip.style.top = top + 'px';
+          imgTip.style.left = left + 'px';
+        });
+        badge.addEventListener('mouseout', () => {
+          imgTip.style.display = 'none';
+        });
+      });
+    }
   }
-  
-  // Update export, save, and edit mode buttons
+
+  // Update export, save, edit mode, and delete all buttons
   exportBtn.disabled = steps.length === 0;
   saveBtn.disabled = steps.length === 0;
   editModeBtn.disabled = steps.length === 0;
+  if (deleteAllBtn) deleteAllBtn.disabled = steps.length === 0;
   
   // Update edit mode button state
   if (isEditMode) {
-    editModeBtn.textContent = '✓ Edit Mode';
+    editModeBtn.innerHTML = ICONS.check;
+    editModeBtn.title = 'Exit Edit Mode';
     editModeBtn.classList.add('btn-active');
   } else {
-    editModeBtn.textContent = '✏️ Edit Mode';
+    editModeBtn.innerHTML = ICONS.pencil;
+    editModeBtn.title = 'Toggle Edit Mode';
     editModeBtn.classList.remove('btn-active');
   }
 }
@@ -1373,7 +1920,7 @@ function escapeHtml(text) {
 }
 
 // Format steps with screenshots for clipboard (HTML format with embedded images)
-function formatStepsForClipboardWithScreenshots(steps) {
+function formatStepsForClipboardWithScreenshots(steps, editable = false) {
   if (steps.length === 0) {
     return { html: '<p>No steps recorded.</p>', text: 'No steps recorded.' };
   }
@@ -1405,9 +1952,6 @@ function formatStepsForClipboardWithScreenshots(steps) {
           elementLower === '' || elementLower.length < 2) {
         return;
       }
-      if (elementLower.length <= 5 && !step.value) {
-        return;
-      }
     }
     
     // Skip redundant form submissions
@@ -1431,10 +1975,11 @@ function formatStepsForClipboardWithScreenshots(steps) {
   
   // Build HTML with embedded screenshots
   let htmlOutput = '<div style="font-family: Arial, sans-serif; line-height: 1.6;">';
-  htmlOutput += '<h2 style="color: #0052CC; border-bottom: 2px solid #0052CC; padding-bottom: 5px;">Steps to Reproduce</h2>';
+  const titleAttrs = editable ? ' contenteditable="true" spellcheck="false" title="Click to edit title" style="color: #0052CC; border-bottom: 2px solid #0052CC; padding-bottom: 5px; outline: none; cursor: text;" onfocus="this.style.background=\'#F4F5F7\'" onblur="this.style.background=\'\'"' : ' style="color: #0052CC; border-bottom: 2px solid #0052CC; padding-bottom: 5px;"';
+  htmlOutput += `<h2${titleAttrs}>${escapeHtml(reportTitle)}</h2>`;
   
   // Build plain text version
-  let textOutput = 'Steps to Reproduce\n\n';
+  let textOutput = `${reportTitle}\n\n`;
   
   let stepNum = 0;
   cleanedSteps.forEach((step, index) => {
@@ -1470,15 +2015,20 @@ function formatStepsForClipboardWithScreenshots(steps) {
     // Add to HTML with screenshot
     htmlOutput += `<div style="margin: 15px 0; padding: 10px; background: #f9f9f9; border-left: 4px solid #0052CC; border-radius: 4px;">`;
     htmlOutput += `<p style="margin: 0 0 10px 0;"><strong>${escapeHtml(stepText)}</strong></p>`;
-    
+    if (step.note) {
+      htmlOutput += `<p style="margin: 4px 0 8px 0; color: #666; font-style: italic; font-size: 13px;">📝 ${escapeHtml(step.note)}</p>`;
+    }
     // Add screenshot if available
     if (step.screenshot) {
       htmlOutput += `<img src="${step.screenshot}" alt="Screenshot for step ${stepNum}" style="max-width: 800px; border: 1px solid #ddd; border-radius: 4px; margin: 10px 0; display: block;">`;
     }
     htmlOutput += `</div>`;
-    
+
     // Add to text version
     textOutput += stepText + '\n';
+    if (step.note) {
+      textOutput += `   Note: ${step.note}\n`;
+    }
     if (step.screenshot) {
       textOutput += `\n[Screenshot available for this step]\n`;
     }
@@ -1486,18 +2036,23 @@ function formatStepsForClipboardWithScreenshots(steps) {
   });
   
   // Add environment info
+  const env = getEnvironmentInfo();
   htmlOutput += '<hr style="margin: 20px 0;">';
   htmlOutput += '<h3 style="color: #0052CC;">Environment</h3>';
   htmlOutput += `<p><strong>Starting URL:</strong> ${escapeHtml(cleanedSteps[0].url)}</p>`;
-  htmlOutput += `<p><strong>Browser:</strong> Chrome</p>`;
-  htmlOutput += `<p><strong>Recorded:</strong> ${new Date(cleanedSteps[0].timestamp).toLocaleString()}</p>`;
+  htmlOutput += `<p><strong>Browser:</strong> ${escapeHtml(env.browser)}</p>`;
+  htmlOutput += `<p><strong>OS:</strong> ${escapeHtml(env.os)}</p>`;
+  htmlOutput += `<p><strong>Screen:</strong> ${escapeHtml(env.viewport)}</p>`;
+  htmlOutput += `<p><strong>Recorded:</strong> ${escapeHtml(env.timestamp)}</p>`;
   htmlOutput += '</div>';
-  
+
   textOutput += '---\n\n';
   textOutput += 'Environment\n\n';
   textOutput += `Starting URL: ${cleanedSteps[0].url}\n`;
-  textOutput += `Browser: Chrome\n`;
-  textOutput += `Recorded: ${new Date(cleanedSteps[0].timestamp).toLocaleString()}\n`;
+  textOutput += `Browser: ${env.browser}\n`;
+  textOutput += `OS: ${env.os}\n`;
+  textOutput += `Screen: ${env.viewport}\n`;
+  textOutput += `Recorded: ${env.timestamp}\n`;
   
   return { html: htmlOutput, text: textOutput };
 }
@@ -1579,7 +2134,7 @@ function formatStepsForJira(steps) {
     return 'No meaningful steps recorded.';
   }
   
-  let output = 'h2. Steps to Reproduce\n\n';
+  let output = `h2. ${reportTitle}\n\n`;
   
   // Format steps sequentially without grouping by URL or page headers
   let stepNum = 0;
@@ -1597,10 +2152,10 @@ function formatStepsForJira(steps) {
           const pathname = urlObj.pathname === '/' ? 'home page' : urlObj.pathname;
           const hash = urlObj.hash ? urlObj.hash : '';
           const displayPath = hash ? `${pathname}${hash}` : pathname;
-          output += `${stepNum}. Navigate to ${displayPath}\n`;
-          output += `   *URL:* ${step.url}\n\n`;
+          const wrappedUrl = step.url.length > 80 ? step.url.replace(/([?&])/g, '\n   $1') : step.url;
+          output += `${stepNum}. Navigate to ${urlObj.hostname}${displayPath}\n`;
+          output += `   *URL:* ${wrappedUrl}\n\n`;
         } catch (e) {
-          // If URL parsing fails, just show the URL
           output += `${stepNum}. Navigate to ${step.url}\n`;
           output += `   *URL:* ${step.url}\n\n`;
         }
@@ -1633,28 +2188,28 @@ function formatStepsForJira(steps) {
     }
     
     output += stepText + '\n';
-    
-    // Add URL for each step
-    output += `   *URL:* ${step.url}\n`;
-    
-    // Add screenshot directly in the text - try to embed it in a way Jira might accept
-    if (step.screenshot) {
-      // Try embedding the image using HTML img tag (some Jira instances support this)
-      // Also include it as a data URL that might work with drag-and-drop or image paste
-      output += `\n{html}<img src="${step.screenshot}" alt="Screenshot for step ${stepNum}" style="max-width: 800px; border: 1px solid #ddd; border-radius: 4px; margin: 10px 0; display: block;">{html}\n`;
-      // Also add a note for manual upload if HTML doesn't work
-      output += `\n*Note: If image doesn't appear, upload screenshot-step-${stepNum}.png and reference as !screenshot-step-${stepNum}.png!*\n`;
+
+    // Show URL: full URL on its own line, wrapped if long
+    const urlDisplay = step.url.length > 80
+      ? step.url.replace(/([?&])/g, '\n   $1')
+      : step.url;
+    output += `   *URL:* ${urlDisplay}\n`;
+    if (step.note) {
+      output += `   _📝 Note: ${step.note}_\n`;
     }
-    
+
     output += '\n';
   });
-  
+
   // Add environment information
+  const env = getEnvironmentInfo();
   output += '---\n\n';
   output += 'h2. Environment\n\n';
   output += `*Starting URL:* ${cleanedSteps[0].url}\n`;
-  output += `*Browser:* Chrome\n`;
-  output += `*Recorded:* ${new Date(cleanedSteps[0].timestamp).toLocaleString()}\n`;
+  output += `*Browser:* ${env.browser}\n`;
+  output += `*OS:* ${env.os}\n`;
+  output += `*Screen:* ${env.viewport}\n`;
+  output += `*Recorded:* ${env.timestamp}\n`;
   
   // Add technical details section with cleaner format
   const hasTechnicalDetails = cleanedSteps.some(s => s.selector && s.selector.length < 200);
@@ -1685,9 +2240,9 @@ function formatStepsForMarkdown(steps) {
   if (steps.length === 0) {
     return 'No steps recorded.';
   }
-  
-  let output = '# Steps to Reproduce\n\n';
-  
+
+  let output = `# ${reportTitle}\n\n`;
+
   steps.forEach((step, index) => {
     output += `## Step ${index + 1}\n\n`;
     output += `**Action:** ${step.action}\n\n`;
@@ -1696,6 +2251,9 @@ function formatStepsForMarkdown(steps) {
       output += `**Value:** ${step.value}\n\n`;
     }
     output += `**URL:** ${step.url}\n\n`;
+    if (step.note) {
+      output += `> 📝 **Note:** ${step.note}\n\n`;
+    }
     if (step.selector) {
       output += `**Selector:** \`${step.selector}\`\n\n`;
     }
@@ -1705,7 +2263,14 @@ function formatStepsForMarkdown(steps) {
     }
     output += '---\n\n';
   });
-  
+
+  const env = getEnvironmentInfo();
+  output += '## Environment\n\n';
+  output += `**Browser:** ${env.browser}\n\n`;
+  output += `**OS:** ${env.os}\n\n`;
+  output += `**Screen:** ${env.viewport}\n\n`;
+  output += `**Recorded:** ${env.timestamp}\n`;
+
   return output;
 }
 
@@ -1715,7 +2280,7 @@ function formatStepsForHTML(steps) {
     return '<p>No steps recorded.</p>';
   }
   
-  let output = '<!DOCTYPE html><html><head><title>Steps to Reproduce</title><style>body{font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto;}h1{color:#333;}h2{color:#0052CC;border-bottom:2px solid #0052CC;padding-bottom:5px;}table{width:100%;border-collapse:collapse;margin:20px 0;}th,td{padding:10px;text-align:left;border-bottom:1px solid #ddd;}th{background:#f5f5f5;font-weight:bold;}.step-number{background:#0052CC;color:white;padding:5px 10px;border-radius:3px;display:inline-block;margin-right:10px;}</style></head><body><h1>Steps to Reproduce</h1>';
+  let output = `<!DOCTYPE html><html><head><title>${escapeHtml(reportTitle)}</title><style>body{font-family:Arial,sans-serif;padding:20px;max-width:800px;margin:0 auto;}h1{color:#333;outline:none;cursor:text;}h1[contenteditable]:hover{outline:1px dashed #999;}h1[contenteditable]:focus{outline:1px dashed #0052CC;background:#fafbfc;}h2{color:#0052CC;border-bottom:2px solid #0052CC;padding-bottom:5px;}table{width:100%;border-collapse:collapse;margin:20px 0;}th,td{padding:10px;text-align:left;border-bottom:1px solid #ddd;}th{background:#f5f5f5;font-weight:bold;}.step-number{background:#0052CC;color:white;padding:5px 10px;border-radius:3px;display:inline-block;margin-right:10px;}</style></head><body><h1 contenteditable="true" spellcheck="false" title="Click to edit title">${escapeHtml(reportTitle)}</h1>`;
   
   steps.forEach((step, index) => {
     output += `<div style="margin:20px 0;padding:15px;background:#f9f9f9;border-left:4px solid #0052CC;border-radius:4px;">`;
@@ -1725,6 +2290,9 @@ function formatStepsForHTML(steps) {
       output += ` with value "${step.value}"`;
     }
     output += `<br><small style="color:#666;">URL: ${step.url}</small>`;
+    if (step.note) {
+      output += `<br><em style="color:#666;font-size:13px;">📝 ${step.note}</em>`;
+    }
     if (step.selector) {
       output += `<br><code style="background:#f0f0f0;padding:2px 5px;border-radius:2px;">${step.selector}</code>`;
     }
@@ -1735,6 +2303,11 @@ function formatStepsForHTML(steps) {
     output += `</div>`;
   });
   
+  const env = getEnvironmentInfo();
+  output += `<div style="margin:20px 0;padding:12px;background:#f0f7ff;border-left:4px solid #0052CC;border-radius:4px;font-size:13px;">`;
+  output += `<strong>Environment</strong><br>`;
+  output += `Browser: ${env.browser}<br>OS: ${env.os}<br>Screen: ${env.viewport}<br>Recorded: ${env.timestamp}`;
+  output += `</div>`;
   output += '</body></html>';
   return output;
 }
@@ -1744,10 +2317,10 @@ function formatStepsForPlainText(steps) {
   if (steps.length === 0) {
     return 'No steps recorded.';
   }
-  
-  let output = 'STEPS TO REPRODUCE\n';
+
+  let output = `${reportTitle.toUpperCase()}\n`;
   output += '='.repeat(50) + '\n\n';
-  
+
   steps.forEach((step, index) => {
     output += `Step ${index + 1}: ${step.action} "${step.element || 'element'}"`;
     if (step.value) {
@@ -1755,32 +2328,88 @@ function formatStepsForPlainText(steps) {
     }
     output += '\n';
     output += `  URL: ${step.url}\n`;
+    if (step.note) {
+      output += `  Note: ${step.note}\n`;
+    }
     if (step.selector) {
       output += `  Selector: ${step.selector}\n`;
     }
     output += '\n';
   });
-  
+
+  const env = getEnvironmentInfo();
+  output += '='.repeat(50) + '\n';
+  output += 'ENVIRONMENT\n';
+  output += '='.repeat(50) + '\n';
+  output += `Browser: ${env.browser}\n`;
+  output += `OS: ${env.os}\n`;
+  output += `Screen: ${env.viewport}\n`;
+  output += `Recorded: ${env.timestamp}\n`;
+
   return output;
 }
 
 // Format steps for JSON
 function formatStepsForJSON(steps) {
+  const env = getEnvironmentInfo();
   return JSON.stringify({
-    title: 'Steps to Reproduce',
+    title: reportTitle,
     recordedAt: new Date().toISOString(),
     totalSteps: steps.length,
+    environment: env,
     steps: steps.map((step, index) => ({
       stepNumber: index + 1,
       action: step.action,
       element: step.element,
       value: step.value,
+      note: step.note || null,
       url: step.url,
       selector: step.selector,
       timestamp: step.timestamp
     }))
   }, null, 2);
 }
+
+// ── JS fixed-position tooltip (for buttons inside overflow-clipped containers) ──
+// Handles [data-js-tooltip] elements anywhere in the popup, regardless of overflow.
+(function () {
+  const tip = document.getElementById('js-tooltip');
+  if (!tip) return;
+
+  document.addEventListener('mouseover', (e) => {
+    const btn = e.target.closest('[data-js-tooltip]');
+    if (!btn) return;
+    const text = btn.getAttribute('data-js-tooltip');
+    if (!text) return;
+
+    tip.textContent = text;
+    tip.style.display = 'block';
+
+    const r = btn.getBoundingClientRect();
+    const tipW = tip.offsetWidth;
+    const tipH = tip.offsetHeight;
+
+    // Prefer above the button; flip below if not enough room
+    let top = r.top - tipH - 6;
+    if (top < 4) top = r.bottom + 6; // flip below
+
+    // Centre horizontally, keep inside popup (popup is 400px wide)
+    let left = r.left + r.width / 2 - tipW / 2;
+    left = Math.max(4, Math.min(left, 396 - tipW));
+
+    tip.style.top = top + 'px';
+    tip.style.left = left + 'px';
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    const btn = e.target.closest('[data-js-tooltip]');
+    if (!btn) return;
+    tip.style.display = 'none';
+  });
+
+  // Hide on click too
+  document.addEventListener('click', () => { tip.style.display = 'none'; });
+})();
 
 // Refresh steps periodically when recording
 setInterval(() => {

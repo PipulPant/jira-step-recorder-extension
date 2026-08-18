@@ -7,10 +7,10 @@
   "permissions": [
     "activeTab",
     "storage",
+    "unlimitedStorage",
     "scripting",
     "tabs",
-    "tabCapture",
-    "desktopCapture"
+    "clipboardWrite"
   ],
   "host_permissions": [
     "<all_urls>"

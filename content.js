@@ -3,6 +3,27 @@ let isRecording = false;
 let isPaused = false;
 let stepCounter = 0;
 
+// ── Ignore patterns (Feature 5) ─────────────────────────────────────
+let ignorePatterns = [];
+chrome.storage.local.get(['ignorePatterns'], (result) => {
+  ignorePatterns = result.ignorePatterns || [];
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.ignorePatterns) {
+    ignorePatterns = changes.ignorePatterns.newValue || [];
+  }
+});
+
+function isIgnoredStep(step) {
+  if (!ignorePatterns.length) return false;
+  const url = (step.url || '').toLowerCase();
+  const element = (step.element || '').toLowerCase();
+  return ignorePatterns.some(pattern => {
+    const p = pattern.toLowerCase();
+    return url.includes(p) || element.includes(p);
+  });
+}
+
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Jira Recorder: Received message', request.action);
@@ -56,110 +77,205 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true;
 });
 
+// A class name is "noise" (css-in-js hash, not human-meaningful) if it's a
+// styled-components/emotion hash, or mixed-case with no word-like separator
+// (e.g. "eZEQjR"). Hyphenated/underscored or single-case classes are kept.
+function isNoisyClass(cls) {
+  if (/^(sc|css)-/.test(cls)) return true;
+  return /^[a-zA-Z0-9]+$/.test(cls) && /[a-z]/.test(cls) && /[A-Z]/.test(cls) && !/^[A-Z][a-z0-9]+$/.test(cls);
+}
+
 // Get element selector
 function getElementSelector(element) {
   if (!element || !element.tagName) return '';
-  
+  const tag = element.tagName.toLowerCase();
+
   // Try ID first
   if (element.id) {
     return `#${element.id}`;
   }
-  
-  // Try class
+
+  // Try data attributes (most stable, human-readable)
+  const testIdAttr = ['data-testid', 'data-qa', 'data-cy', 'data-test'].find(a => element.getAttribute(a));
+  if (testIdAttr) {
+    return `[${testIdAttr}="${element.getAttribute(testIdAttr)}"]`;
+  }
+
+  if (element.getAttribute('name')) {
+    return `${tag}[name="${element.getAttribute('name')}"]`;
+  }
+
+  // Try class, filtering out hashed/generated class names that add no meaning
   if (element.className && typeof element.className === 'string') {
-    const classes = element.className.split(' ').filter(c => c).join('.');
-    if (classes) {
-      return `${element.tagName.toLowerCase()}.${classes}`;
+    const classes = element.className.split(' ').filter(c => c && !isNoisyClass(c));
+    if (classes.length) {
+      return `${tag}.${classes.slice(0, 3).join('.')}`;
     }
   }
-  
-  // Try data attributes
-  if (element.getAttribute('data-testid')) {
-    return `[data-testid="${element.getAttribute('data-testid')}"]`;
-  }
-  
-  if (element.getAttribute('name')) {
-    return `${element.tagName.toLowerCase()}[name="${element.getAttribute('name')}"]`;
-  }
-  
+
   // Fallback to tag name
-  return element.tagName.toLowerCase();
+  return tag;
 }
+
+// Interactive ARIA roles that should always be recorded
+const INTERACTIVE_ROLES = new Set([
+  'button', 'link', 'menuitem', 'tab', 'option', 'checkbox', 'radio',
+  'switch', 'treeitem', 'gridcell', 'columnheader', 'rowheader',
+  'menuitemcheckbox', 'menuitemradio', 'combobox', 'listbox', 'searchbox'
+]);
 
 // Get element description
 function getElementDescription(element) {
   if (!element) return '';
-  
+
   const tagName = element.tagName?.toLowerCase();
-  
+
+  // Follow aria-labelledby reference (highest priority explicit label)
+  const labelledById = element.getAttribute?.('aria-labelledby');
+  if (labelledById) {
+    const labelEl = document.getElementById(labelledById);
+    if (labelEl) {
+      const text = labelEl.textContent?.trim();
+      if (text && text.length < 100) return text;
+    }
+  }
+
   // Try aria-label
-  if (element.getAttribute('aria-label')) {
+  if (element.getAttribute?.('aria-label')) {
     return element.getAttribute('aria-label');
   }
-  
+
   // Try title
   if (element.title) {
     return element.title;
   }
-  
-  // Try text content for buttons/links
-  if (['button', 'a'].includes(tagName)) {
-    const text = element.textContent?.trim();
+
+  // For SVG elements — check for <title> child or aria-label on the SVG container
+  if (tagName === 'svg' || tagName === 'path' || tagName === 'g' || tagName === 'use' || tagName === 'circle' || tagName === 'rect') {
+    const svgTitle = element.querySelector?.('title');
+    if (svgTitle?.textContent?.trim()) return svgTitle.textContent.trim();
+    const svgContainer = element.closest?.('[aria-label]');
+    if (svgContainer) return svgContainer.getAttribute('aria-label');
+    return ''; // decorative SVG — skip
+  }
+
+  // Try text content for buttons, links, list items, options
+  if (['button', 'a', 'li', 'option'].includes(tagName)) {
+    const text = (element.innerText || element.textContent)?.trim().replace(/\s+/g, ' ');
     if (text && text.length < 100 && text.length > 0) {
       return text;
     }
   }
-  
+
   // Try placeholder for inputs
   if (element.placeholder) {
     return element.placeholder;
   }
-  
-  // Try label
+
+  // Try associated label (for inputs)
   if (element.labels && element.labels.length > 0) {
     const labelText = element.labels[0].textContent?.trim();
     if (labelText) {
       return labelText;
     }
   }
-  
+
   // Try name attribute
   if (element.name) {
     return element.name;
   }
-  
-  // For divs and spans, try to find meaningful content
+
+  // Try data attributes used in testing frameworks
+  for (const attr of ['data-label', 'data-qa', 'data-cy', 'data-testid', 'data-test']) {
+    const val = element.getAttribute?.(attr);
+    if (val && val.length < 100) return val;
+  }
+
+  // For divs and spans
   if (tagName === 'div' || tagName === 'span') {
-    // Try to find text content
-    const text = element.textContent?.trim();
+    const text = (element.innerText || element.textContent)?.trim().replace(/\s+/g, ' ');
     if (text && text.length > 0 && text.length < 100) {
       return text;
     }
-    
-    // Try data attributes
-    if (element.getAttribute('data-testid')) {
-      return element.getAttribute('data-testid');
-    }
-    
-    // Try role attribute
-    if (element.getAttribute('role')) {
+    if (element.getAttribute?.('role')) {
       return `${element.getAttribute('role')} (${tagName})`;
     }
-    
-    // Try to find nearby label or heading
-    const label = element.closest('label');
+    const label = element.closest?.('label');
     if (label) {
       const labelText = label.textContent?.trim();
-      if (labelText && labelText.length < 100) {
-        return labelText;
-      }
+      if (labelText && labelText.length < 100) return labelText;
     }
-    
-    // If no meaningful description found, return empty (will be filtered out)
     return '';
   }
-  
+
+  // For custom elements (e.g. <my-button>, <app-header>)
+  if (tagName?.includes('-')) {
+    const text = (element.innerText || element.textContent)?.trim().replace(/\s+/g, ' ');
+    if (text && text.length < 100 && text.length > 0) return text;
+    const role = element.getAttribute?.('role');
+    if (role) return role;
+    return tagName;
+  }
+
   return tagName;
+}
+
+// Walk up the DOM to find the best element to describe a click
+// Handles: SVG icons inside buttons, React/Angular custom components, role-based elements
+function findBestClickTarget(element) {
+  let candidate = element;
+  let depth = 0;
+
+  while (candidate && candidate !== document.body && depth < 8) {
+    const tag = candidate.tagName?.toLowerCase();
+
+    // Skip the extension's own UI
+    if (candidate.id && candidate.id.startsWith('jira-recorder')) return null;
+
+    // Input/select/textarea handled by their own listeners
+    if (['input', 'select', 'textarea'].includes(tag)) return null;
+
+    // Native interactive elements — always record
+    if (tag === 'button' || tag === 'a' || tag === 'label') return candidate;
+
+    // ARIA interactive role
+    const role = candidate.getAttribute?.('role');
+    if (role && INTERACTIVE_ROLES.has(role)) return candidate;
+
+    // Explicitly keyboard-focusable (tabindex >= 0)
+    const tabindex = candidate.getAttribute?.('tabindex');
+    if (tabindex !== null && tabindex !== '-1') {
+      const desc = getElementDescription(candidate);
+      if (desc && desc !== tag) return candidate;
+    }
+
+    // Inline onclick handler
+    if (candidate.hasAttribute?.('onclick')) {
+      const desc = getElementDescription(candidate);
+      if (desc && desc !== tag) return candidate;
+    }
+
+    // Custom element (tag contains hyphen — Web Components, Angular, React)
+    if (tag && tag.includes('-')) return candidate;
+
+    // cursor:pointer computed style — common pattern in React/Vue/Angular apps
+    try {
+      const style = window.getComputedStyle(candidate);
+      if (style.cursor === 'pointer') {
+        const desc = getElementDescription(candidate);
+        if (desc && desc !== tag) return candidate;
+      }
+    } catch (_) {}
+
+    candidate = candidate.parentElement;
+    depth++;
+  }
+
+  // Final fallback: use original element only if it has a real description
+  const origDesc = getElementDescription(element);
+  if (origDesc && origDesc !== element.tagName?.toLowerCase()) return element;
+
+  return null;
 }
 
 // Record a step
@@ -215,40 +331,116 @@ function recordStep(action, element, value = null) {
   }
   
   // Capture screenshot for this step
-  captureScreenshotForStep(step);
+  captureScreenshotForStep(step, element);
+}
+
+// Draw a highlight box around the interacted element so the screenshot shows
+// exactly what was clicked/typed into, instead of leaving the reader to guess.
+function highlightElementForScreenshot(element) {
+  if (!element || element === document.body || element === document.documentElement) return null;
+  if (typeof element.getBoundingClientRect !== 'function' || !document.body.contains(element)) return null;
+
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+
+  const box = document.createElement('div');
+  box.id = 'step-recorder-highlight-overlay';
+  box.style.cssText = `
+    position: fixed;
+    left: ${rect.left - 3}px;
+    top: ${rect.top - 3}px;
+    width: ${rect.width + 6}px;
+    height: ${rect.height + 6}px;
+    border: 3px solid #FF5630;
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px rgba(255,86,48,0.35);
+    pointer-events: none;
+    z-index: 2147483647;
+  `;
+  document.body.appendChild(box);
+  return box;
 }
 
 // Capture screenshot for a step
-function captureScreenshotForStep(step) {
-  // Request screenshot capture from background script
-  chrome.runtime.sendMessage({
-    action: 'captureScreenshot',
-    tabId: null // Will be determined in background script
-  }, (screenshotResponse) => {
-    if (screenshotResponse && screenshotResponse.success && screenshotResponse.screenshot) {
-      // Add screenshot to step
-      step.screenshot = screenshotResponse.screenshot;
-      console.log('Jira Recorder: Screenshot captured for step');
-    } else {
-      console.log('Jira Recorder: Screenshot capture failed or not available');
-    }
-    
-    // Send step to background script (with or without screenshot)
-    chrome.runtime.sendMessage({
-      action: 'addStep',
-      step: step
-    }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('Jira Recorder: Error sending step', chrome.runtime.lastError);
-      } else {
-        if (response && response.success) {
-          console.log('Jira Recorder: Step recorded successfully');
-        } else {
-          console.warn('Jira Recorder: Step recording failed', response);
-        }
-      }
-    });
+function captureScreenshotForStep(step, targetElement) {
+  // Hide EVERY extension UI element injected into the page body
+  // Uses attribute selector so we never miss newly added elements
+  const extensionEls = Array.from(document.body.querySelectorAll('[id^="jira-recorder"]'));
+  extensionEls.forEach(el => {
+    el.dataset._prevVisibility = el.style.visibility;
+    el.style.setProperty('visibility', 'hidden', 'important');
   });
+
+  const highlightBox = highlightElementForScreenshot(targetElement);
+
+  // Wait for the next real paint (not an arbitrary timeout) so the hidden UI/highlight box
+  // are actually on screen before captureVisibleTab fires — this also minimizes the window
+  // where a click that opens a new tab or navigates away can race past the capture.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    chrome.runtime.sendMessage({
+      action: 'captureScreenshot',
+      tabId: null
+    }, (screenshotResponse) => {
+      // Restore every element we hid
+      extensionEls.forEach(el => {
+        el.style.setProperty('visibility', el.dataset._prevVisibility || '', 'important');
+        if (!el.dataset._prevVisibility) el.style.removeProperty('visibility');
+        delete el.dataset._prevVisibility;
+      });
+      if (highlightBox) highlightBox.remove();
+
+      if (screenshotResponse && screenshotResponse.success && screenshotResponse.screenshot) {
+        step.screenshot = screenshotResponse.screenshot;
+        console.log('Jira Recorder: Screenshot captured for step');
+      } else {
+        console.log('Jira Recorder: Screenshot capture failed or not available');
+      }
+
+      // Feature 5: Check ignore patterns before adding
+      if (isIgnoredStep(step)) {
+        console.log('Jira Recorder: Step ignored by pattern', step.url, step.element);
+        return;
+      }
+
+      // Feature 4: Merge consecutive typing steps for the same element
+      if (step.action === 'Type in') {
+        chrome.runtime.sendMessage({ action: 'getSteps' }, (stepsResp) => {
+          const existingSteps = (stepsResp && stepsResp.steps) || [];
+          const last = existingSteps[existingSteps.length - 1];
+          if (last && last.action === 'Type in' && last.element === step.element && last.url === step.url) {
+            chrome.runtime.sendMessage({ action: 'updateLastStep', step: step }, (response) => {
+              if (!response || !response.success) {
+                // Fallback: add normally
+                chrome.runtime.sendMessage({ action: 'addStep', step: step }, () => {});
+              }
+            });
+            return;
+          }
+          chrome.runtime.sendMessage({ action: 'addStep', step: step }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error('Jira Recorder: Error sending step', chrome.runtime.lastError);
+            }
+          });
+        });
+        return;
+      }
+
+      chrome.runtime.sendMessage({
+        action: 'addStep',
+        step: step
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('Jira Recorder: Error sending step', chrome.runtime.lastError);
+        } else {
+          if (response && response.success) {
+            console.log('Jira Recorder: Step recorded successfully');
+          } else {
+            console.warn('Jira Recorder: Step recording failed', response);
+          }
+        }
+      });
+    });
+  }));
 }
 
 // Show pen writing animation
@@ -340,12 +532,71 @@ function showPenWritingAnimation(element) {
 
 // Store observer reference for cleanup
 let urlObserver = null;
+// Track the last URL we recorded a navigation step for, to prevent duplicates
+// from both MutationObserver and pushState/replaceState/popstate all firing
+let lastRecordedNavigationUrl = null;
+
+// Show brief shortcut notification message near top of page
+function showShortcutNotification(message) {
+  const existing = document.getElementById('jira-recorder-shortcut-notif');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'jira-recorder-shortcut-notif';
+  el.textContent = message;
+  el.style.cssText = `
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,82,204,0.92);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 16px;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 9999999;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    white-space: nowrap;
+  `;
+  document.body.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 1500);
+}
+
+// Global keyboard shortcut listener (Feature 6)
+// Alt+Shift+S = toggle recording, Alt+Shift+P = toggle pause
+document.addEventListener('keydown', (e) => {
+  // Skip if focus is inside an input/textarea
+  const tag = document.activeElement && document.activeElement.tagName.toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+  if (e.altKey && e.shiftKey && e.key === 'S') {
+    e.preventDefault();
+    chrome.runtime.sendMessage({ action: 'toggleRecording' }, (response) => {
+      if (response && response.action === 'stopped') {
+        showShortcutNotification('⌨️ Recording stopped');
+      } else if (response && response.action === 'started') {
+        showShortcutNotification('⌨️ Recording started');
+      }
+    });
+  } else if (e.altKey && e.shiftKey && e.key === 'P') {
+    e.preventDefault();
+    chrome.runtime.sendMessage({ action: 'togglePause' }, (response) => {
+      if (response && response.action === 'paused') {
+        showShortcutNotification('⌨️ Recording paused');
+      } else if (response && response.action === 'resumed') {
+        showShortcutNotification('⌨️ Recording resumed');
+      }
+    });
+  }
+}, true);
 
 // Attach event listeners
 function attachEventListeners() {
   // Remove existing listeners first to avoid duplicates
   removeEventListeners();
-  
+
   // Use capture phase to catch events early
   document.addEventListener('click', handleClick, true);
   document.addEventListener('input', handleInput, true);
@@ -362,7 +613,8 @@ function attachEventListeners() {
   urlObserver = new MutationObserver(() => {
     if (window.location.href !== lastUrl) {
       lastUrl = window.location.href;
-      if (isRecording && !isPaused) {
+      if (isRecording && !isPaused && window.location.href !== lastRecordedNavigationUrl) {
+        lastRecordedNavigationUrl = window.location.href;
         recordStep('Navigate to', document.body, window.location.href);
       }
     }
@@ -374,7 +626,8 @@ function attachEventListeners() {
   
   // Also listen to popstate for browser navigation
   window.addEventListener('popstate', () => {
-    if (isRecording && !isPaused) {
+    if (isRecording && !isPaused && window.location.href !== lastRecordedNavigationUrl) {
+      lastRecordedNavigationUrl = window.location.href;
       recordStep('Navigate to', document.body, window.location.href);
     }
   });
@@ -388,16 +641,18 @@ function attachEventListeners() {
   history.pushState = function(...args) {
     window._jiraRecorderOriginalPushState.apply(history, args);
     setTimeout(() => {
-      if (isRecording && !isPaused) {
+      if (isRecording && !isPaused && window.location.href !== lastRecordedNavigationUrl) {
+        lastRecordedNavigationUrl = window.location.href;
         recordStep('Navigate to', document.body, window.location.href);
       }
     }, 100);
   };
-  
+
   history.replaceState = function(...args) {
     window._jiraRecorderOriginalReplaceState.apply(history, args);
     setTimeout(() => {
-      if (isRecording && !isPaused) {
+      if (isRecording && !isPaused && window.location.href !== lastRecordedNavigationUrl) {
+        lastRecordedNavigationUrl = window.location.href;
         recordStep('Navigate to', document.body, window.location.href);
       }
     }, 100);
@@ -436,54 +691,49 @@ function removeEventListeners() {
 
 // Event handlers
 function handleClick(event) {
-  if (!isRecording) return;
-  
-  const element = event.target;
-  const tagName = element.tagName?.toLowerCase();
-  
+  if (!isRecording || isPaused) return;
+
+  const rawTarget = event.target;
+  const rawTag = rawTarget.tagName?.toLowerCase();
+
   // Skip if clicking on recording indicator, popup, or their children
-  if (element.id === 'jira-recorder-indicator' || 
-      element.closest('#jira-recorder-indicator') ||
-      element.id === 'jira-recorder-stop-btn' ||
-      element.id === 'jira-recorder-popup' ||
-      element.closest('#jira-recorder-popup') ||
-      element.id === 'jira-recorder-toggle-popup') {
+  if (rawTarget.id === 'jira-recorder-indicator' ||
+      rawTarget.closest?.('#jira-recorder-indicator') ||
+      rawTarget.id === 'jira-recorder-stop-btn' ||
+      rawTarget.id === 'jira-recorder-popup' ||
+      rawTarget.closest?.('#jira-recorder-popup') ||
+      rawTarget.id === 'jira-recorder-toggle-popup') {
     return;
   }
-  
-  // Skip if clicking inside an input/textarea (those are handled separately)
-  if (tagName === 'input' || tagName === 'textarea') return;
-  
-  // Get element description - if empty, it means it's a generic element we should skip
+
+  // Skip input/textarea/select — handled by handleInput/handleChange
+  if (rawTag === 'input' || rawTag === 'textarea' || rawTag === 'select') return;
+
+  // Walk up DOM to find the best element to describe (handles SVG icons, custom components, etc.)
+  const element = findBestClickTarget(rawTarget);
+  if (!element) return;
+
+  const tagName = element.tagName?.toLowerCase();
   const elementDesc = getElementDescription(element);
-  
-  // Skip generic divs/spans without meaningful description
-  if ((tagName === 'div' || tagName === 'span') && !elementDesc) {
-    return; // Don't record generic div/span clicks
+  if (!elementDesc) return;
+
+  // Track button-type clicks to suppress redundant form submissions
+  const role = element.getAttribute?.('role');
+  if (tagName === 'button' ||
+      element.getAttribute?.('type') === 'submit' ||
+      role === 'button' ||
+      (element.closest?.('form') && (elementDesc.toLowerCase().includes('submit') ||
+                                      elementDesc.toLowerCase().includes('register') ||
+                                      elementDesc.toLowerCase().includes('save')))) {
+    recentButtonClick = true;
+    if (buttonClickTimeout) clearTimeout(buttonClickTimeout);
+    buttonClickTimeout = setTimeout(() => {
+      recentButtonClick = false;
+      buttonClickTimeout = null;
+    }, 500);
   }
-  
-  // Record clicks on meaningful elements
-  if (elementDesc) {
-    // Track button clicks to avoid redundant form submissions
-    if (tagName === 'button' || 
-        element.type === 'submit' || 
-        element.getAttribute('type') === 'submit' ||
-        (element.closest('form') && (element.textContent?.toLowerCase().includes('submit') || 
-                                     element.textContent?.toLowerCase().includes('register') ||
-                                     element.textContent?.toLowerCase().includes('save')))) {
-      recentButtonClick = true;
-      // Clear the flag after 500ms
-      if (buttonClickTimeout) {
-        clearTimeout(buttonClickTimeout);
-      }
-      buttonClickTimeout = setTimeout(() => {
-        recentButtonClick = false;
-        buttonClickTimeout = null;
-      }, 500);
-    }
-    
-    recordStep('Click on', element);
-  }
+
+  recordStep('Click on', element);
 }
 
 // Track input fields to avoid duplicate recordings
@@ -518,13 +768,19 @@ function handleInput(event) {
 // Also capture keydown for immediate feedback on typing
 function handleKeyDown(event) {
   if (!isRecording) return;
-  
+
   const element = event.target;
   const tagName = element.tagName?.toLowerCase();
-  
-  // Record Enter key presses
+
+  // Record Enter key presses in input/textarea
   if (event.key === 'Enter' && (tagName === 'input' || tagName === 'textarea')) {
-    // Small delay to let the input event fire first
+    // Cancel the debounced "Type in" step — Enter press takes priority
+    const existingTimeout = inputFields.get(element);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+      inputFields.delete(element);
+    }
+
     setTimeout(() => {
       if (isRecording && element.value && element.value.trim()) {
         recordStep('Type and press Enter in', element, element.value);
@@ -599,10 +855,26 @@ function showRecordingIndicator() {
       existingPopup.remove();
     }
     
+    // Restore saved position or default to bottom-right (less intrusive than top-right)
+    const savedPos = (() => {
+      try { return JSON.parse(localStorage.getItem('jira-recorder-indicator-pos')); } catch(_) { return null; }
+    })();
+    const initTop  = savedPos ? savedPos.top  : (window.innerHeight - 60) + 'px';
+    const initLeft = savedPos ? savedPos.left : (window.innerWidth  - 200) + 'px';
+
     const indicator = document.createElement('div');
     indicator.id = 'jira-recorder-indicator';
     indicator.innerHTML = `
-      <span style="margin-right: 8px;">${isPaused ? '⏸️ Paused' : '🔴 Recording'}</span>
+      <span id="jira-recorder-drag-handle" title="Drag to move" style="
+        cursor: grab;
+        margin-right: 6px;
+        font-size: 16px;
+        opacity: 0.7;
+        line-height: 1;
+        padding: 0 2px;
+        user-select: none;
+      ">⠿</span>
+      <span id="jira-recorder-status-label" style="margin-right: 8px; cursor: pointer; white-space: nowrap;" title="Click to show/hide recorded steps">${isPaused ? '⏸️ Paused' : '🔴 Recording'}</span>
       <button id="jira-recorder-stop-btn" style="
         background: rgba(255,255,255,0.2);
         border: 1px solid rgba(255,255,255,0.3);
@@ -612,26 +884,27 @@ function showRecordingIndicator() {
         cursor: pointer;
         font-size: 12px;
         font-weight: bold;
-        margin-left: 8px;
+        flex-shrink: 0;
       ">Stop</button>
     `;
     indicator.style.cssText = `
       position: fixed;
-      top: 10px;
-      right: 10px;
+      top: ${initTop};
+      left: ${initLeft};
       background: ${isPaused ? '#ffa500' : '#ff4444'};
       color: white;
-      padding: 8px 12px;
-      border-radius: 6px;
+      padding: 7px 10px;
+      border-radius: 20px;
       font-family: Arial, sans-serif;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: bold;
       z-index: 999999;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      box-shadow: 0 3px 12px rgba(0,0,0,0.35);
       display: flex;
       align-items: center;
       user-select: none;
-      cursor: move;
+      cursor: default;
+      transition: box-shadow 0.15s;
     `;
     
     try {
@@ -649,6 +922,63 @@ function showRecordingIndicator() {
       }, 500);
     }
     
+    // ── Make the indicator draggable ────────────────────────────────
+    let indDragging = false, indStartX, indStartY, indOrigLeft, indOrigTop;
+    const dragHandle = indicator.querySelector('#jira-recorder-drag-handle');
+
+    const onIndMouseDown = (e) => {
+      // Only drag on left-button press on the handle (or indicator background, not buttons)
+      if (e.button !== 0) return;
+      indDragging = true;
+      indStartX   = e.clientX;
+      indStartY   = e.clientY;
+      indOrigLeft = indicator.getBoundingClientRect().left;
+      indOrigTop  = indicator.getBoundingClientRect().top;
+      indicator.style.transition = 'none';
+      if (dragHandle) dragHandle.style.cursor = 'grabbing';
+      e.preventDefault();
+    };
+
+    if (dragHandle) dragHandle.addEventListener('mousedown', onIndMouseDown);
+
+    const onIndMouseMove = (e) => {
+      if (!indDragging) return;
+      const dx = e.clientX - indStartX;
+      const dy = e.clientY - indStartY;
+      let newLeft = indOrigLeft + dx;
+      let newTop  = indOrigTop  + dy;
+      // Clamp to viewport
+      newLeft = Math.max(0, Math.min(window.innerWidth  - indicator.offsetWidth,  newLeft));
+      newTop  = Math.max(0, Math.min(window.innerHeight - indicator.offsetHeight, newTop));
+      indicator.style.left  = newLeft + 'px';
+      indicator.style.top   = newTop  + 'px';
+      indicator.style.right = 'auto';
+      // Also move popup alongside indicator if it's visible
+      const popupEl = document.getElementById('jira-recorder-popup');
+      if (popupEl && popupEl.style.display !== 'none') {
+        popupEl.style.left = newLeft + 'px';
+        popupEl.style.top  = (newTop + indicator.offsetHeight + 6) + 'px';
+        popupEl.style.right = 'auto';
+      }
+    };
+
+    const onIndMouseUp = () => {
+      if (!indDragging) return;
+      indDragging = false;
+      if (dragHandle) dragHandle.style.cursor = 'grab';
+      indicator.style.transition = '';
+      // Persist position
+      try {
+        localStorage.setItem('jira-recorder-indicator-pos', JSON.stringify({
+          top:  indicator.style.top,
+          left: indicator.style.left
+        }));
+      } catch(_) {}
+    };
+
+    document.addEventListener('mousemove', onIndMouseMove);
+    document.addEventListener('mouseup',   onIndMouseUp);
+
     // Add click handler for stop button
     const stopBtn = document.getElementById('jira-recorder-stop-btn');
     if (stopBtn) {
@@ -674,7 +1004,28 @@ function showRecordingIndicator() {
         stopBtn.style.background = 'rgba(255,255,255,0.2)';
       });
     }
-    
+
+    // Clicking the status label toggles the Recent Steps popup
+    const statusLabel = document.getElementById('jira-recorder-status-label');
+    if (statusLabel) {
+      statusLabel.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const popupEl = document.getElementById('jira-recorder-popup');
+        if (!popupEl) return;
+        const isVisible = popupEl.style.display !== 'none';
+        if (isVisible) {
+          popupEl.style.display = 'none';
+        } else {
+          // Re-anchor popup just below the indicator in its current (possibly dragged) position
+          const r = indicator.getBoundingClientRect();
+          popupEl.style.left  = Math.max(0, Math.min(r.left, window.innerWidth - 325)) + 'px';
+          popupEl.style.top   = Math.min(r.bottom + 6, window.innerHeight - 420) + 'px';
+          popupEl.style.right = 'auto';
+          popupEl.style.display = 'flex';
+        }
+      });
+    }
+
     // Create steps popup
     const popup = document.createElement('div');
     popup.id = 'jira-recorder-popup';
@@ -728,17 +1079,19 @@ function showRecordingIndicator() {
       text-align: center;
     "     id="jira-recorder-step-count">0 steps</div>
     `;
+    // Position popup just below the indicator
+    const indRect = indicator.getBoundingClientRect();
     popup.style.cssText = `
       position: fixed;
-      top: 60px;
-      right: 10px;
+      top: ${Math.min(indRect.bottom + 6, window.innerHeight - 420)}px;
+      left: ${Math.max(0, Math.min(indRect.left, window.innerWidth - 325))}px;
       width: 320px;
       background: white;
       border-radius: 6px;
       font-family: Arial, sans-serif;
       z-index: 999998;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      display: flex;
+      display: none;
       flex-direction: column;
       max-height: 400px;
       pointer-events: auto;
@@ -806,25 +1159,14 @@ function showRecordingIndicator() {
       isDragging = false;
     });
     
-    // Toggle popup collapse
+    // The × button inside the popup closes (hides) it; user re-opens by clicking the indicator label
     const toggleBtn = document.getElementById('jira-recorder-toggle-popup');
     if (toggleBtn) {
-      let isCollapsed = false;
+      toggleBtn.textContent = '×';
+      toggleBtn.title = 'Close';
       toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        isCollapsed = !isCollapsed;
-        const stepsList = document.getElementById('jira-recorder-steps-list');
-        const stepCount = document.getElementById('jira-recorder-step-count');
-        if (isCollapsed) {
-          stepsList.style.display = 'none';
-          stepCount.style.display = 'none';
-          toggleBtn.textContent = '+';
-          popup.style.height = 'auto';
-        } else {
-          stepsList.style.display = 'block';
-          stepCount.style.display = 'block';
-          toggleBtn.textContent = '−';
-        }
+        popup.style.display = 'none';
       });
     }
     
@@ -858,10 +1200,13 @@ function loadExistingStepsForPopup() {
 function updateRecordingIndicator() {
   const indicator = document.getElementById('jira-recorder-indicator');
   if (!indicator) return;
-  
-  const statusText = indicator.querySelector('span');
-  if (statusText) {
-    statusText.textContent = isPaused ? '⏸️ Paused' : '🔴 Recording';
+
+  const statusLabel = document.getElementById('jira-recorder-status-label');
+  if (statusLabel) {
+    const count = recentSteps.length;
+    statusLabel.textContent = isPaused
+      ? `⏸️ Paused (${count})`
+      : `🔴 Recording (${count})`;
   }
   indicator.style.background = isPaused ? '#ffa500' : '#ff4444';
 }
@@ -965,15 +1310,26 @@ function updateStepsPopup() {
           color: #666;
           font-size: 11px;
         ">
-          ${step.element || 'element'}
-          ${valueText ? '<br/>' + valueText : ''}
+          ${step.action === 'Navigate to'
+            ? (() => { try { const u = new URL(step.value || step.element || ''); return u.hostname + (u.pathname !== '/' ? u.pathname : ''); } catch(_) { return step.value || step.element || 'page'; } })()
+            : (step.element && step.element !== 'body' ? step.element : (step.value || ''))
+          }
+          ${valueText && step.action !== 'Navigate to' ? '<br/>' + valueText : ''}
         </div>
       </div>
     `;
   }).join('');
   
   stepCount.textContent = `${recentSteps.length} step${recentSteps.length !== 1 ? 's' : ''} recorded`;
-  
+
+  // Also update the indicator label to show live step count
+  const statusLabel = document.getElementById('jira-recorder-status-label');
+  if (statusLabel) {
+    statusLabel.textContent = isPaused
+      ? `⏸️ Paused (${recentSteps.length})`
+      : `🔴 Recording (${recentSteps.length})`;
+  }
+
   // Auto-scroll to bottom
   stepsList.scrollTop = stepsList.scrollHeight;
 }
@@ -1207,36 +1563,64 @@ function hideNotification(notification) {
   }, 300);
 }
 
-// Copy steps to clipboard
+// Copy steps to clipboard — includes screenshots as inline images
 async function copyStepsToClipboard(steps) {
   try {
-    // Format steps for Jira (plain text with Jira markup only)
-    // This ensures Jira recognizes the markup syntax
+    const formatted = formatStepsForClipboardWithScreenshots(steps);
     const jiraText = formatStepsForJira(steps);
-    
-    // Copy ONLY plain text (Jira markup) - don't include HTML
-    // This ensures Jira's editor recognizes the markup syntax correctly
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(jiraText);
-      console.log('Jira Recorder: Steps copied to clipboard (Jira markup only)');
-      return;
-    } else {
-      // Fallback - use textarea to ensure plain text copy
-      const textarea = document.createElement('textarea');
-      textarea.value = jiraText;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      textarea.setSelectionRange(0, 99999); // For mobile devices
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      console.log('Jira Recorder: Steps copied to clipboard (fallback method)');
+
+    // Try ClipboardItem API — supports both HTML (with images) and plain text
+    if (navigator.clipboard && navigator.clipboard.write) {
+      try {
+        const clipboardItem = new ClipboardItem({
+          'text/html': new Blob([formatted.html], { type: 'text/html' }),
+          'text/plain': new Blob([jiraText], { type: 'text/plain' })
+        });
+        await navigator.clipboard.write([clipboardItem]);
+        console.log('Jira Recorder: Steps copied with images (ClipboardItem)');
+        return;
+      } catch (clipErr) {
+        console.log('Jira Recorder: ClipboardItem failed, trying execCommand:', clipErr.message);
+      }
     }
+
+    // Fallback: contenteditable + execCommand copies rich HTML including base64 images.
+    // Paste into Jira's rich text editor to get images inline.
+    const tempDiv = document.createElement('div');
+    tempDiv.contentEditable = 'true';
+    tempDiv.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;width:1px;height:1px;overflow:hidden;';
+    tempDiv.innerHTML = formatted.html;
+    document.body.appendChild(tempDiv);
+
+    const range = document.createRange();
+    range.selectNodeContents(tempDiv);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.execCommand('copy');
+
+    document.body.removeChild(tempDiv);
+    selection.removeAllRanges();
+    console.log('Jira Recorder: Steps copied with images (execCommand)');
   } catch (err) {
-    console.error('Jira Recorder: Error copying steps:', err);
-    alert('Failed to copy steps. Please try again.');
+    console.error('Jira Recorder: Error copying steps with images:', err);
+    // Final fallback — plain text only
+    try {
+      const jiraText = formatStepsForJira(steps);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(jiraText);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = jiraText;
+        textarea.style.cssText = 'position:fixed;left:-9999px;opacity:0;';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+    } catch (e) {
+      alert('Failed to copy steps. Please use the Preview button instead.');
+    }
   }
 }
 
@@ -1286,9 +1670,6 @@ function formatStepsForJira(steps) {
           elementLower === '' || elementLower.length < 2) {
         return;
       }
-      if (elementLower.length <= 5 && !step.value) {
-        return;
-      }
     }
     
     // Skip redundant form submissions
@@ -1310,7 +1691,7 @@ function formatStepsForJira(steps) {
     return 'No meaningful steps recorded.';
   }
   
-  let output = 'h2. Steps to Reproduce\n\n';
+  let output = 'h2. Execution Steps\n\n';
   let stepNum = 0;
   
   cleanedSteps.forEach((step, index) => {
@@ -1353,7 +1734,9 @@ function formatStepsForJira(steps) {
     
     output += stepText + '\n';
     output += `   *URL:* ${step.url}\n`;
-    
+    if (step.note) {
+      output += `   _📝 Note: ${step.note}_\n`;
+    }
     if (step.screenshot) {
       output += `\n{html}<img src="${step.screenshot}" alt="Screenshot for step ${stepNum}" style="max-width: 800px; border: 1px solid #ddd; border-radius: 4px; margin: 10px 0; display: block;">{html}\n`;
       output += `\n*Note: If image doesn't appear, upload screenshot-step-${stepNum}.png and reference as !screenshot-step-${stepNum}.png!*\n`;
@@ -1400,9 +1783,6 @@ function formatStepsForClipboardWithScreenshots(steps) {
           elementLower === '' || elementLower.length < 2) {
         return;
       }
-      if (elementLower.length <= 5 && !step.value) {
-        return;
-      }
     }
     
     if (step.action === 'Submit form' && lastStep && 
@@ -1424,10 +1804,10 @@ function formatStepsForClipboardWithScreenshots(steps) {
   }
   
   // Build HTML
-  let htmlOutput = '<!DOCTYPE html><html><head><title>Steps to Reproduce</title><style>body{font-family:Arial,sans-serif;line-height:1.6;padding:20px;max-width:900px;margin:0 auto;}h2{color:#0052CC;border-bottom:2px solid #0052CC;padding-bottom:5px;}h3{color:#0052CC;}div.step{margin:15px 0;padding:15px;background:#f9f9f9;border-left:4px solid #0052CC;border-radius:4px;}img{max-width:800px;border:1px solid #ddd;border-radius:4px;margin:10px 0;display:block;}a{color:#0052CC;text-decoration:none;}a:hover{text-decoration:underline;}</style></head><body>';
-  htmlOutput += '<h2>Steps to Reproduce</h2>';
+  let htmlOutput = '<!DOCTYPE html><html><head><title>Execution Steps</title><style>body{font-family:Arial,sans-serif;line-height:1.6;padding:20px;max-width:900px;margin:0 auto;}h2{color:#0052CC;border-bottom:2px solid #0052CC;padding-bottom:5px;}h3{color:#0052CC;}div.step{margin:15px 0;padding:15px;background:#f9f9f9;border-left:4px solid #0052CC;border-radius:4px;}img{max-width:800px;border:1px solid #ddd;border-radius:4px;margin:10px 0;display:block;}a{color:#0052CC;text-decoration:none;}a:hover{text-decoration:underline;}</style></head><body>';
+  htmlOutput += '<h2>Execution Steps</h2>';
   
-  let textOutput = 'Steps to Reproduce\n\n';
+  let textOutput = 'Execution Steps\n\n';
   let stepNum = 0;
   
   cleanedSteps.forEach((step, index) => {
@@ -1488,15 +1868,23 @@ function formatStepsForClipboardWithScreenshots(steps) {
     htmlOutput += `<p style="margin:0 0 10px 0;"><strong>${escapeHtml(stepText)}</strong></p>`;
     htmlOutput += `<p style="margin:5px 0;color:#666;font-size:14px;"><strong>URL:</strong> <a href="${escapeHtml(step.url)}" target="_blank" style="color:#0052CC;text-decoration:none;">${escapeHtml(step.url)}</a></p>`;
     
+    // Add note if present
+    if (step.note) {
+      htmlOutput += `<p style="margin:6px 0 4px 0;color:#666;font-style:italic;font-size:13px;">📝 ${escapeHtml(step.note)}</p>`;
+    }
+
     // Add screenshot if available
     if (step.screenshot) {
       htmlOutput += `<img src="${step.screenshot}" alt="Screenshot for step ${stepNum}" style="max-width:800px;border:1px solid #ddd;border-radius:4px;margin:10px 0;display:block;">`;
     }
-    
+
     htmlOutput += `</div>`;
-    
+
     textOutput += stepText + '\n';
     textOutput += `   URL: ${step.url}\n`;
+    if (step.note) {
+      textOutput += `   Note: ${step.note}\n`;
+    }
     if (step.screenshot) {
       textOutput += `\n[Screenshot available for this step]\n`;
     }

@@ -191,11 +191,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         id: Date.now().toString(),
         name: request.name,
         steps: request.steps,
+        tags: request.tags || [],
         savedAt: new Date().toISOString()
       };
       savedRecordings.push(newRecording);
-      chrome.storage.local.set({ savedRecordings: savedRecordings });
-      sendResponse({ success: true });
+      chrome.storage.local.set({ savedRecordings: savedRecordings }, () => {
+        if (chrome.runtime.lastError) {
+          // Quota exceeded — retry with screenshots stripped from the new recording only
+          console.warn('Jira Recorder: Save failed (quota?), retrying without screenshots:', chrome.runtime.lastError.message);
+          const stripped = { ...newRecording, steps: newRecording.steps.map(s => ({ ...s, screenshot: null })) };
+          const withStripped = [...savedRecordings.slice(0, -1), stripped];
+          chrome.storage.local.set({ savedRecordings: withStripped }, () => {
+            if (chrome.runtime.lastError) {
+              sendResponse({ success: false, error: chrome.runtime.lastError.message });
+            } else {
+              sendResponse({ success: true, note: 'Screenshots omitted due to storage limits' });
+            }
+          });
+        } else {
+          sendResponse({ success: true });
+        }
+      });
     });
   } else if (request.action === 'getSavedRecordings') {
     chrome.storage.local.get(['savedRecordings'], (result) => {
@@ -220,6 +236,68 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       chrome.storage.local.set({ savedRecordings: filtered });
       sendResponse({ success: true });
     });
+  } else if (request.action === 'updateLastStep') {
+    if (steps.length > 0 && isRecording && !isPaused) {
+      steps[steps.length - 1] = { ...steps[steps.length - 1], value: request.step.value, screenshot: request.step.screenshot };
+      chrome.storage.local.set({ steps: steps });
+      sendResponse({ success: true });
+    } else {
+      sendResponse({ success: false });
+    }
+  } else if (request.action === 'toggleRecording') {
+    if (isRecording) {
+      // Stop recording
+      isRecording = false;
+      isPaused = false;
+      chrome.storage.local.set({ isRecording: false, isPaused: false });
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+          if (tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+            chrome.tabs.sendMessage(tab.id, { action: 'stopRecording' }).catch(() => {});
+          }
+        });
+      });
+      sendResponse({ success: true, action: 'stopped', steps: steps });
+    } else {
+      // Start recording (keep existing steps)
+      isRecording = true;
+      isPaused = false;
+      chrome.storage.local.set({ isRecording: true, isPaused: false });
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+          if (tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+            chrome.tabs.sendMessage(tab.id, { action: 'startRecording', clearSteps: false }).catch(() => {});
+          }
+        });
+      });
+      sendResponse({ success: true, action: 'started' });
+    }
+  } else if (request.action === 'togglePause') {
+    if (isPaused) {
+      isPaused = false;
+      chrome.storage.local.set({ isPaused: false });
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+          if (tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+            chrome.tabs.sendMessage(tab.id, { action: 'resumeRecording' }).catch(() => {});
+          }
+        });
+      });
+      sendResponse({ success: true, action: 'resumed' });
+    } else if (isRecording) {
+      isPaused = true;
+      chrome.storage.local.set({ isPaused: true });
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+          if (tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'))) {
+            chrome.tabs.sendMessage(tab.id, { action: 'pauseRecording' }).catch(() => {});
+          }
+        });
+      });
+      sendResponse({ success: true, action: 'paused' });
+    } else {
+      sendResponse({ success: false, reason: 'not_recording' });
+    }
   } else if (request.action === 'updateAllSteps') {
     steps = request.steps || [];
     chrome.storage.local.set({ steps: steps });
